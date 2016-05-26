@@ -1,0 +1,27 @@
+# Windows default autosave extension
+*.asv
+
+# OSX / *nix default autosave extension
+*.m~
+
+# Compiled MEX binaries (all platforms)
+*.mex*
+
+# Simulink Code Generation
+slprj/
+
+# Session info
+octave-workspacei
+
+# Ignore OSX DS_Store
+.DS_Store
+
+# Ignore IFCB_analysis code
+IFCB_analysis/*
+
+# Ignore DIPUM functions
+DIPUM/*
+
+# Ignore old code
+ecotaxa_org/*
+
