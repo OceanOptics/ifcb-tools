@@ -1,21 +1,29 @@
 % IFCB to EcoTaxa
 % Export IFCB raw data to png images and .tsv files compatible with EcoTaxa
+%   Run the following steps:
+%       1. Blob extraction
+%       2. Feature analysis
+%       3. Export PNG
+%       4. Build TSV file
 % author: Nils Haentjens <nils.haentjens+ifcb@maine.edu>
 % created: May 21, 2016
-% updated: May 21, 2016
+% updated: July 12, 2016
 % Acknowledge: Pierre-Luc Grandin and Heidi M. Sosik
 
 clear();
 close('all');
 clc();
 
-%% Set location of configuration file
+% Set location of configuration file
 cfg.filename = 'default.cfg';
 
-% No modification needed bellow here
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%  No modifications needed below here  %%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% 1. Load configuration
+%% 1. Load configuration
 fprintf('Loading configuration... ');
+
 addpath('helpers');
 cfg = loadCfg(cfg.filename);
 fprintf('Done\n');

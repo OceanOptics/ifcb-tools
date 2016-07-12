@@ -11,7 +11,7 @@
 slprj/
 
 # Session info
-octave-workspacei
+octave-workspace
 
 # Ignore OSX DS_Store
 .DS_Store
@@ -25,3 +25,5 @@ DIPUM/*
 # Ignore old code
 ecotaxa_org/*
 
+# Ignore config files
+cfg/*
