@@ -44,8 +44,8 @@ fprintf('Done\n');
 %% 3. Blobs extraction
 if cfg.process.blobs;
   fprintf('Extracting '); tic;
-  bins=dir([cfg.path.in 'D*.adc']);
-  bins=regexprep({bins(:).name}', '.adc', '');
+  bins=dir([cfg.path.in 'D*.roi']);
+  bins=regexprep({bins(:).name}', '.roi', '');
   dir_in=repmat(cellstr(cfg.path.in),size(bins,1),1);
   cfg.path.wk_blobs=[cfg.path.wk 'blobs'];
   dir_out=repmat(cellstr(cfg.path.wk_blobs),size(bins,1),1);
@@ -60,8 +60,8 @@ end;
 %% 4. Features extraction
 if cfg.process.features;
   fprintf('Extracting '); tic;
-  bins=dir([cfg.path.in 'D*.adc']);
-  bins=regexprep({bins(:).name}', '.adc', '');
+  bins=dir([cfg.path.in 'D*.roi']);
+  bins=regexprep({bins(:).name}', '.roi', '');
   fprintf('%d features... \n', size(bins,1));
   dir_in_raw=repmat(cellstr(cfg.path.in),size(bins,1),1);
   cfg.path.wk_blobs=[cfg.path.wk 'blobs' filesep];
