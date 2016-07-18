@@ -16,14 +16,15 @@ octave-workspace
 # Ignore OSX DS_Store
 .DS_Store
 
-# Ignore IFCB_analysis code
+# Ignore depndencies
 IFCB_analysis/*
-
-# Ignore DIPUM functions
 DIPUM/*
 
-# Ignore old code
+# Ignore personal code
 ecotaxa_org/*
+generate_metadata/*
 
-# Ignore config files
+# Ignore local data
 cfg/*
+classifiers/*
+

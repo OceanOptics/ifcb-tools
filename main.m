@@ -31,6 +31,8 @@ fprintf('Done\n');
 %% 2. Load IFCB_analysis code
 fprintf('Loading IFCB_analysis... ');
 addpath(cfg.path.ifcb_analysis,...
+        [cfg.path.ifcb_analysis 'classification' filesep],...
+        [cfg.path.ifcb_analysis 'classification' filesep 'batch_classification' filesep],...
         [cfg.path.ifcb_analysis 'feature_extraction' filesep],...
         [cfg.path.ifcb_analysis 'feature_extraction' filesep 'blob_extraction' filesep],...
         [cfg.path.ifcb_analysis 'feature_extraction' filesep 'batch_features_bins' filesep],...
@@ -43,13 +45,13 @@ fprintf('Done\n');
 
 %% 3. Blobs extraction
 if cfg.process.blobs;
-  fprintf('Extracting '); tic;
+  fprintf('Extracting blobs from '); tic;
   bins=dir([cfg.path.in 'D*.roi']);
   bins=regexprep({bins(:).name}', '.roi', '');
   dir_in=repmat(cellstr(cfg.path.in),size(bins,1),1);
   cfg.path.wk_blobs=[cfg.path.wk 'blobs'];
   dir_out=repmat(cellstr(cfg.path.wk_blobs),size(bins,1),1);
-  fprintf('%d blobs... \n', size(bins,1));
+  fprintf('%d bins... \n', size(bins,1));
   batch_blobs(dir_in, dir_out, bins, cfg.proc.parallel);
   %start_blob_batch_user_training(cfg.path.in, cfg.path.wk_blobs, cfg.proc.parallel);
   toc
@@ -59,10 +61,10 @@ end;
 
 %% 4. Features extraction
 if cfg.process.features;
-  fprintf('Extracting '); tic;
+  fprintf('Extracting features of '); tic;
   bins=dir([cfg.path.in 'D*.roi']);
   bins=regexprep({bins(:).name}', '.roi', '');
-  fprintf('%d features... \n', size(bins,1));
+  fprintf('%d bins... \n', size(bins,1));
   dir_in_raw=repmat(cellstr(cfg.path.in),size(bins,1),1);
   cfg.path.wk_blobs=[cfg.path.wk 'blobs' filesep];
   dir_in_blob=repmat(cellstr(cfg.path.wk_blobs),size(bins,1),1);
@@ -75,7 +77,23 @@ if cfg.process.features;
   clearvars('-except', 'cfg');
 end;
 
-%% 5. Images extraction
+%% 5. Run Classification
+if cfg.process.classification;
+  fprintf('Classifying '); tic;
+  cfg.path.wk_features = [cfg.path.wk 'features' filesep];
+  features = dir([cfg.path.wk_features '*_fea_v2.csv']);
+  features = {features(:).name}';
+  fprintf('%d bin of images... \n', size(bins,1));
+  cfg.path.wk_classes=[cfg.path.wk 'classes' filesep];
+  dir_out=cfg.path.wk_classes;
+  if ~isdir(dir_out); mkdir(dir_out); end;
+  batch_classify( cfg.path.wk_features, features, dir_out, cfg.path.classifier, cfg.proc.parallel);
+  toc
+  fprintf('Extraction of features done\n');
+  clearvars('-except', 'cfg');
+end;
+
+%% 6. Images extraction
 if cfg.process.images;
   fprintf('Extracting images...\n'); tic;
   cfg.path.wk_images=[cfg.path.wk 'images' filesep];
@@ -110,7 +128,7 @@ if cfg.process.images;
   clearvars('-except', 'cfg');
 end;
 
-%% 6. Export to EcoTaxa format
+%% 7. Export to EcoTaxa
 if cfg.process.export;
   fprintf('Exporting to EcoTaxa...\n'); tic;
   % ifcb2ecotaxa
