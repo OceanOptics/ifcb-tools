@@ -83,7 +83,7 @@ if cfg.process.classification;
   cfg.path.wk_features = [cfg.path.wk 'features' filesep];
   features = dir([cfg.path.wk_features '*_fea_v2.csv']);
   features = {features(:).name}';
-  fprintf('%d bin of images... \n', size(bins,1));
+  fprintf('%d bin of images... \n', size(features,1));
   cfg.path.wk_classes=[cfg.path.wk 'classes' filesep];
   dir_out=cfg.path.wk_classes;
   if ~isdir(dir_out); mkdir(dir_out); end;
