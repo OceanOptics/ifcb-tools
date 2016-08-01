@@ -1,9 +1,9 @@
-IFCB to EcoTaxa
-===============
+easyIFCB
+========
 
 The purpose of this set of code is to convert IFCB (Imaging Flow CytoBot)
-raw data to input for EcoTaxa. This is based on Pierre-Luc Grandin matlab code
-and require the IFCB_analysis toolbox from Heidi M. Sosik.
+raw data to input for EcoTaxa. This is build on top of the IFCB_analysis
+toolbox from Heidi M. Sosik.
 
 ### General workflow
 EcoTaxa takes in input a ".tsv" file containing a set of features caracterizing
