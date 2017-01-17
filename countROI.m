@@ -1,5 +1,6 @@
 % Count number of ROI
-% author: Nils Haentjens
+%   No preprocessing step is required
+% author: Nils Haentjens <nils.haentjens+ifcb@maine.edu>
 % created: May 2016
 
 % 0. Load configuration

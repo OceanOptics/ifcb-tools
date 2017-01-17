@@ -1,13 +1,12 @@
-% IFCB to EcoTaxa
+% easyIFCB
 % Export IFCB raw data to png images and .tsv files compatible with EcoTaxa
 %   Run the following steps:
-%       1. Blob extraction
-%       2. Feature analysis
-%       3. Export PNG
-%       4. Build TSV file
+%       1. Blobs extraction
+%       2. Features extraction
+%       3. Images extraction
+%       4. Build TSV file for ecotaxa
 % author: Nils Haentjens <nils.haentjens+ifcb@maine.edu>
 % created: May 21, 2016
-% updated: July 12, 2016
 % Acknowledge: Pierre-Luc Grandin and Heidi M. Sosik
 
 clear();
