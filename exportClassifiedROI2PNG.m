@@ -70,7 +70,7 @@ fprintf('Done\n');
 %% 4. Export images
 % This loop can be very long and generate a lot of data
 fprintf('Exporting roi by class... \n');
-dir_out = [cfg.path.wk 'images_' cfg.process.selection filesep];
+dir_out = [cfg.path.wk 'images_' cfg.process.selection_name filesep];
 if ~isdir(dir_out); mkdir(dir_out); end;  j = 1;
 for i = 1:size(roi_id_sel,1)
   if i == 1 || bin_sel(i-1) ~= bin_sel(i)
