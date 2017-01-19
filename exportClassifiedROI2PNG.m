@@ -27,24 +27,15 @@ if cfg.class.import
   % Load all data
   bin=cell(n,1); dt=NaN(n,1);
   roi_id=cell(n,1); TBclass=cell(n,1); TBclassQC=cell(n,1);
-  if cfg.proc.parallel
-    parfor i=1:n
-      bin{i} = bins{i}(1:24);
-      dt(i) = datenum(bins{i}(2:16), 'yyyymmddTHHMMSS');
-      foo = load([cfg.path.classified bins{i}]);
-      roi_id{i} = foo.roinum;
-      TBclass{i} = cellfun(@(x) find(strcmp(class_names, x)), foo.TBclass);
-      TBclassQC{i} = cellfun(@(x) find(strcmp(class_names, x)), foo.TBclass_above_threshold); 
-    end;
-  else
-    for i=1:n
-      bin{i} = bins{i}(1:24);
-      dt(i) = datenum(bins{i}(2:16), 'yyyymmddTHHMMSS');
-      foo = load([cfg.path.classified bins{i}]);
-      roi_id{i} = foo.roinum;
-      TBclass{i} = cellfun(@(x) find(strcmp(class_names, x)), foo.TBclass);
-      TBclassQC{i} = cellfun(@(x) find(strcmp(class_names, x)), foo.TBclass_above_threshold); 
-    end;
+  if cfg.process.parallel; parfor_arg = Inf;
+  else; parfor_arg = 0; end;
+  parfor (i=1:n, parfor_arg)
+    bin{i} = bins{i}(1:24);
+    dt(i) = datenum(bins{i}(2:16), 'yyyymmddTHHMMSS');
+    foo = load([cfg.path.classified bins{i}]);
+    roi_id{i} = foo.roinum;
+    TBclass{i} = cellfun(@(x) find(strcmp(class_names, x)), foo.TBclass);
+    TBclassQC{i} = cellfun(@(x) find(strcmp(class_names, x)), foo.TBclass_above_threshold); 
   end;
   save([cfg.path.wk 'classified'], 'bin', 'dt', 'roi_id', 'TBclass', 'TBclassQC', 'class_names');
   fprintf('Done\n'); toc;  

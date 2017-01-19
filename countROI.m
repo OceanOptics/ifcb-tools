@@ -19,21 +19,15 @@ cfg.path.wk_selection = [cfg.path.selection cfg.process.selection];
 if cfg.counts.import
   fprintf('Importing counts... ');  tic;% ~2 min
   bins=dir([cfg.path.in 'D*.adc']);
-  bins={bins(:).name};
+  bins={bins(:).name};  n = size(bins,2);
   dt=NaN(size(bins,2),1); counts=dt; bin={};
-  if cfg.proc.parallel
-    parfor i=1:size(bins,2)
-      bin{i,1} = bins{i}(1:24);
-      dt(i,1)=datenum(bins{i}(2:16), 'yyyymmddTHHMMSS');
-      counts(i,1)=getNumberROI([cfg.path.in bins{i}]);
-    end;
-  else
-    for i=1:size(bins,2)
-      bin{i,1} = bins{i}(1:24);
-      dt(i,1)=datenum(bins{i}(2:16), 'yyyymmddTHHMMSS');
-      counts(i,1)=getNumberROI([cfg.path.in bins{i}]);
-    end;
-  end;
+  if cfg.process.parallel; parfor_arg = Inf;
+  else; parfor_arg = 0; end;
+  parfor (i=1:n, parfor_arg)
+    bin{i,1} = bins{i}(1:24);
+    dt(i,1)=datenum(bins{i}(2:16), 'yyyymmddTHHMMSS');
+    counts(i,1)=getNumberROI([cfg.path.in bins{i}]);
+  end
   if ~isdir(cfg.path.wk); mkdir(cfg.path.wk); end;
   save([cfg.path.wk 'counts'], 'bin', 'dt', 'counts');
   fprintf('Done\n'); toc;  

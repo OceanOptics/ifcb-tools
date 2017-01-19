@@ -1,6 +1,6 @@
 function [ sel ] = getSelection( bin, filename )
 %GETSELECTION Import selection from list in text file
-if nargin > 1 && ~isempty(filename)
+if nargin > 1 && ~isempty(filename) && ~strcmp(filename(end-2:end),'all')
   % load selection from file
   f = fopen(filename);
   data = textscan(f, '%s', 'Delimiter', ',');

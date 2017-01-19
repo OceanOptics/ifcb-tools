@@ -40,25 +40,15 @@ if cfg.feature.import
   bins={bins(:).name}; n = size(bins,2);
   bin=cell(n,1); dt=NaN(n,1); ftr=cell(n,1);
   range2read = [1 (cfg.feature.column - 1) -1 (cfg.feature.column - 1)];
-  if cfg.proc.parallel
-    parfor i=1:n
-      ftr{i} = dlmread([cfg.path.features bins{i}], ',', range2read);
-      dt(i) = datenum(bins{i}(2:16), 'yyyymmddTHHMMSS');
-      bin{i} = bins{i}(1:24);
-    end;
-  else
-    for i=1:n
-      ftr{i} = dlmread([cfg.path.features bins{i}], ',', range2read);
-      dt(i) = datenum(bins{i}(2:16), 'yyyymmddTHHMMSS');
-      bin{i} = bins{i}(1:24);
-    end;
-  end
-  if cfg.feature.column == 3 && strcmp(cfg.feature.name, 'Diameter');
-    if cfg.proc.parallel
-      parfor i=1:n; ftr{i} = (6 .* ftr{i}) .^ (1/3); end;
-    else
-      for i=1:n; ftr{i} = (6 .* ftr{i}) .^ (1/3); end;
-    end
+  if cfg.process.parallel; parfor_arg = Inf;
+  else; parfor_arg = 0; end;
+  parfor (i=1:n, parfor_arg)
+    ftr{i} = dlmread([cfg.path.features bins{i}], ',', range2read);
+    dt(i) = datenum(bins{i}(2:16), 'yyyymmddTHHMMSS');
+    bin{i} = bins{i}(1:24);
+  end;
+  if cfg.feature.column == 3 && strcmp(cfg.feature.name, 'Diameter')
+    parfor (i=1:n, parfor_arg); ftr{i} = (6 .* ftr{i}) .^ (1/3); end;
   end;
   save([cfg.path.wk 'features_' cfg.feature.name], 'dt', 'ftr', 'bin');
   fprintf('Done\n'); toc;
@@ -69,9 +59,10 @@ else
 end;
 
 %% 3. Selecting data
-fprintf('Filtering... ');
+
 % Get selection of bin
-if isfield(cfg.path, 'wk_selection')
+if isfield(cfg.path, 'wk_selection') && ~strcmp(cfg.path.wk_selection(end-2:end),'all')
+  fprintf('Filtering based on selection... ');
   % load file with selection
   f = fopen(cfg.path.wk_selection);
   data = textscan(f, '%s', 'Delimiter', ',');
@@ -81,13 +72,14 @@ if isfield(cfg.path, 'wk_selection')
     foo = find(not(cellfun('isempty',(strfind(bin, data{i})))));
     if ~isempty(foo); sel(end+1,1) = foo; end;
   end;
-elseif isfield(cfg.bin, 'dt')
+elseif isfield(cfg, 'bin') && isfield(cfg.bin, 'dt')
+  fprintf('Filtering based on dates... ');
   cfg.bin.dt.begin=datenum(cfg.bin.dt.begin_str(2:end), 'yyyymmddTHHMMSS');
   cfg.bin.dt.end=datenum(cfg.bin.dt.end_str(2:end), 'yyyymmddTHHMMSS');
   sel = find(cfg.bin.dt.begin <= dt & dt <= cfg.bin.dt.end);
 else
-  fprintf('Selecting all data\n');
-  sel = 1:size(bin, 1);
+  fprintf('Selecting all data...');
+  sel = [1:size(bin, 1)]';
 end;
 fprintf('Done\n');
 
