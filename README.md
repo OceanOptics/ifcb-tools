@@ -4,20 +4,20 @@ easyIFCB
 The purpose of this set of code is to process Imaging Flow CytoBot (IFCB)
 raw data in order to upload it on EcoTaxa.
 
-EcoTaxa takes in input a `.tsv` file containing a set of features caracterizing
+EcoTaxa takes as input a `.tsv` file containing a set of features characterizing
 the images of phytoplankton captured by the IFCB. The IFCB output is a set of
 `.roi`, `.adc` and `.hdr` files containing the images of phytoplankton
 and some metadata.
 
 The first step is to separate the phytoplankton from the background of the picture,
-this step is called blob extraction. The second step consist in characterizing
+this step is called blob extraction. The second step consists of characterizing
 this region with a set of parameters, this is known as the feature extraction
 and requires the blobs. In order to visualize the features in EcoTaxa,
-images needs to be extracted from the .roi files (with the help of the .adc)
+images need to be extracted from the .roi files (with the help of the .adc)
 and converted to png.
 
-This is exactly what the software is developped for with the help of the
-udge matlab library from Heidi M. Sosik: IFCB_analysis.
+This is exactly what the software is developed for with the help of the
+huge matlab library from Heidi M. Sosik: IFCB_analysis.
 
 ### Quick start protocol
   - First clean the dataset:
@@ -28,7 +28,7 @@ udge matlab library from Heidi M. Sosik: IFCB_analysis.
   - Set configuration file based on default.cfg:
     - Copy and rename default.cfg file
     - Edit that new file with your favorite text editor (Sublime Text, Matlab...)
-    - Follow comments in the file and feel all the fields
+    - Follow comments in the file and fill all the fields
     - To export data to EcoTaxa the following parameters need to be true:
       - `process.blobs=true`
       - `process.features=true`
@@ -37,27 +37,27 @@ udge matlab library from Heidi M. Sosik: IFCB_analysis.
       - `process.classification` can be either `true` or `false`;
           it is not needed by EcoTaxa
   - Process the IFCB data in Matlab:
-      - in `main.m` set the name of the configuration file prepared ealier line 17:
+      - in `main.m` set the name of the configuration file prepared earlier at line 17:
           cfg.filename = 'my_new_configuration_file.cfg'
       - run the script `main.m` (cmd+alt+R), this step can take few
         minutes to days depending on the amount of data to process, the
         number of core available on the computer used, and the speed of
-        the harddrive/SSD. The software will also generate a lot of data
+        the hard drive/SSD. The software will also generate a lot of data
         (especially, the computation of features and the generation of images).
       - At the end you should have one "big" tsv file and a folder of images
         both located as specified in the configuration file.
   - Export to EcoTaxa
     - Set the location of the configuration file in `main.m`
     - Run `main.m`, it will take few minutes to hours depending on the size of
-    the dataset beeing processed, the following step are runned:
+    the dataset being processed, the following step are run:
         - Blobs extraction
         - Features extraction
         - Images extraction
         - Export to EcoTaxa format
 
 ### Installation
-easyIFCB was developped and tested on Matlab 2016 a and b, earlier version
-of Matlab should work but some unexpected behaviour might be observed.
+easyIFCB was developed and tested on Matlab 2016 a and b, earlier version
+of Matlab should work but some unexpected behavior might be observed.
 If you can make sure that you run the proper Matlab version.
 
 easyIFCB is built on top of the IFCB_analysis toolbox available on github.
@@ -96,11 +96,11 @@ An option is available to process only selected bins listed in a file.
 This file should be located in the directory indicated at
 cfg.path.selection and the name of the file is specified in
 cfg.process.selection. By default `cfg.process.selection='all'` which
-means that all the bin present in the directory are processed. This file
+means that all the bins present in the directory are processed. This file
 should contain a list of bin names, one per line. The bin name should be
 formated as follow: D<YYYYMMDD>T<hhmmss>_IFCB<###>
 
-This feature allow to process only a subset of data at a time possibly correspoding to a station or an experiment.
+This feature allows processing of only a subset of data at a time possibly corresponding to a station or an experiment.
 
 
 ### Metadata
@@ -119,7 +119,7 @@ The four first elements are mandatory (bin_id, lat, lon, and depth).
   - sample type <string or empty> (inline, niskin, or incubation)
   - sample id <string or empty> (CTD cast identification number)
   - comments <string or empty>:
-    - it can be any kind of text in lower case without special caracters
+    - it can be any kind of text in lower case without special characters
     - it can be any supplementary field separated by ;
        - stn_id=##; cast_id=##; niskin_id=##
        - T0/Tf=##; dillution=###; bottle_id=###
@@ -132,4 +132,5 @@ Example of file content:
     D20160524T134109_IFCB107, 47.6320, -39.0540,   5, 1.0, 1, inline, ,
     D20160524T140437_IFCB107, 47.6310, -39.0530, NaN, NaN, 1, incubation, AT34020, T0/Tf=Tf; dillution=100; bottle_id=5
     D20160524T143158_IFCB107, 47.6290, -39.0530, NaN, NaN, 1, incubation, AT34020, T0/Tf=Tf; dillution=20; bottle_id=5
+
 
