@@ -15,16 +15,21 @@ parfor (i=1:size(bins,1), parfor_arg)
 % for i=1:size(bins,1)
   bin = bins{i};
   dir_bin=[dir_out bin filesep];
+  
   if ~isdir(dir_bin)
     fprintf('%s conslidate_for_EcoTaxa PREPARING %s\n', utcdate(now()), bin);
-
+  
+    % Set flags
+    missing_images = false;
+    missing_ftr = false;
+    
     % Copy/Move images
     path_images = [dir_image bin]
     if isdir(path_images)
       if rm_tmp_flag; movefile(path_images, dir_out);
       else; copyfile(path_images, dir_bin); end;
     else
-      error('MISSING Images: %s\n', [dir_tsv bin '.tsv']);
+      missing_images = true;
     end;
 
     % Copy/Move features
@@ -33,9 +38,18 @@ parfor (i=1:size(bins,1), parfor_arg)
       if rm_tmp_flag; movefile(path_ftr, dir_bin);
       else; copyfile(path_ftr, dir_bin); end;
     else
-      error('MISSING EcoTaxa TSV: %s\n', [dir_tsv bin '.tsv']);
+      missing_ftr = true;
     end;
     
+    % Check any missing file
+    if missing_images && missing_ftr
+      fprintf('%s export_png EMPTY %s >>> SKIPPING \n', utcdate(now()), bin);
+    elseif missing_images
+      error('MISSING Images: %s\n', [dir_tsv bin '.tsv']);
+    elseif missing_ftr
+      error('MISSING EcoTaxa TSV: %s\n', [dir_tsv bin '.tsv']);
+    end;
+
     % Data was updates need to (re)-zip data
     update_flag(i) = 1;
   else

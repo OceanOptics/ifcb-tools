@@ -6,7 +6,30 @@ function export2PNGWithScaleBar( ROIfile_withpath, outputpath, ROInumbers, scale
 % This function is edited by Nils with code from Pierre-Luc Grondin, May 2016
 % add a scale bar at the bottom of each image
 
-%Add scale bar
+[basedir,filename] = fileparts(ROIfile_withpath);
+%outputpath = [basedir filesep filename filesep];
+
+%get ADC data for startbyte and length of each ROI
+adcfile = [filename '.adc'];
+adcdata = load([basedir filesep adcfile]);
+% Skip empty files
+if isempty(adcdata)
+  fprintf('%s export_png EMPTY %s >>> SKIPPING \n', utcdate(now()), filename);
+  return
+end
+% Parse adcdata
+if isequal(filename(1), 'I')
+    x = adcdata(:,12);  y = adcdata(:,13); startbyte = adcdata(:,14);
+else  %new file format, case 'D*.roi'
+    x = adcdata(:,16);  y = adcdata(:,17); startbyte = adcdata(:,18);
+end;
+
+% Create destination folder
+if ~exist(outputpath, 'dir')
+    mkdir(outputpath);
+end;
+
+% Make scale bar
 % scale_bar.pixel_per_micron = 3.4;  % ratio
 % scale_bar.height = 1.2;  % micron
 % scale_bar.width = 10;  % micron
@@ -15,20 +38,6 @@ scale_bar_width = round(scale_bar.pixel_per_micron*scale_bar.width);
 scale_bar_height = round(scale_bar.pixel_per_micron*scale_bar.height);
 scale_bar_image = zeros(scale_bar_height,scale_bar_width);
 
-[basedir,filename] = fileparts(ROIfile_withpath);
-%outputpath = [basedir filesep filename filesep];
-if ~exist(outputpath, 'dir')
-    mkdir(outputpath);
-end;
-
-%get ADC data for startbyte and length of each ROI
-adcfile = [filename '.adc'];
-adcdata = load([basedir filesep adcfile]);
-if isequal(filename(1), 'I')
-    x = adcdata(:,12);  y = adcdata(:,13); startbyte = adcdata(:,14);
-else  %new file format, case 'D*.roi'
-    x = adcdata(:,16);  y = adcdata(:,17); startbyte = adcdata(:,18);
-end;
 if nargin < 3 || isempty(ROInumbers)
     [ROInumbers] = find(x>0);
 end;

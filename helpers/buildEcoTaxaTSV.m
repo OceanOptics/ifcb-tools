@@ -93,6 +93,14 @@ parfor (i_bin=1:size(feature_ids,1), parfor_arg)
   % Get index in metadata of current bin  
   i_bm = find(strcmp(bin_metadata{1}, bin_id));
   
+  % Load features
+  if exist([dir_features feature_id], 'file');
+    ftr = dlmread([dir_features feature_id], ',', 1, 0);
+  else
+    fprintf('%s build_tsv EMPTY %s >>> SKIPPING \n', utcdate(now()), bin_id);
+    continue;
+  end;
+  
   % Prepare bin's metadata
   object_lat = num2str(bin_metadata{2}(i_bm));
   object_lon = num2str(bin_metadata{3}(i_bm));
@@ -106,6 +114,7 @@ parfor (i_bin=1:size(feature_ids,1), parfor_arg)
     object_depth_max = '';
   end;
   sample_type = bin_metadata{7}{i_bm};
+  sample_flag = '';
   switch bin_metadata{6}(i_bm)
     case 0
       sample_flag = 'unknow';
@@ -153,6 +162,7 @@ parfor (i_bin=1:size(feature_ids,1), parfor_arg)
   end;
   
   % Set Sample ID
+  sample_id = '';
   switch sample_type
     case 'inline'
       if strcmp(global_metadata.process.selection_name, 'All')
@@ -167,9 +177,6 @@ parfor (i_bin=1:size(feature_ids,1), parfor_arg)
     otherwise
       fprintf(['Unknow sample_type ' bin_id ' in metadata.csv\n']);
   end
-  
-  % Load features
-  ftr = dlmread([dir_features feature_id], ',', 1, 0);
 
   % Open TSV file
   f = fopen([dir_out 'ecotaxa_' bin_id '.tsv'], 'w');
