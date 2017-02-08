@@ -14,7 +14,7 @@ close('all');
 clc();
 
 % Set location of configuration file
-cfg.filename = 'default.cfg';
+cfg.filename = 'cfg/NAAMES01.cfg';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%  No modifications needed below here  %%%%%%%%%%%%%%%%%%%
@@ -122,7 +122,7 @@ if cfg.process.images
   end;
   bins=regexprep(bins, '.roi', '');
   
-  scale_bar.pixel_per_micron = cfg.meta.scale_bar_pixel_per_micron;  % ratio
+  scale_bar.pixel_per_micron = cfg.meta.resolution_pixel_per_micron;  % ratio
   scale_bar.height = cfg.meta.scale_bar_height;  % micron
   scale_bar.width = cfg.meta.scale_bar_width;  % micron
   % Parallel processing is not accelerating the process as it's mainly the
@@ -150,7 +150,7 @@ if cfg.process.images
 end;
 
 %% 7. Export to EcoTaxa
-% 7.1 Make TSV file
+% 7.1 Build EcoTaxa TSV file
 if cfg.process.ecotaxa_tsv
   fprintf('Building EcoTaxa TSV files...\n'); tic;
   if strcmp(cfg.process.selection, 'all')
@@ -170,7 +170,7 @@ if cfg.process.ecotaxa_tsv
   toc
   fprintf('Building EcoTaxa TSV files... done\n');
 end;
-% 7.2 Consolidate (& Compress)
+% 7.2 Consolidate (& Compress) for EcoTaxa
 if cfg.process.ecotaxa_consolidate
   fprintf('Consolidating EcoTaxa files...\n'); tic;
   dir_export=[cfg.path.ecotaxa 'import_' lower(cfg.process.selection_name) filesep];
