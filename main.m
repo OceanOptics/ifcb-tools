@@ -150,7 +150,8 @@ if cfg.process.images
 end;
 
 %% 7. Export to EcoTaxa
-if cfg.process.ecotaxa
+% 7.1 Make TSV file
+if cfg.process.ecotaxa_tsv
   fprintf('Building EcoTaxa TSV files...\n'); tic;
   if strcmp(cfg.process.selection, 'all')
     features = dir([cfg.path.features '*_fea_v2.csv']);
@@ -168,6 +169,9 @@ if cfg.process.ecotaxa
   buildEcoTaxaTSV( cfg.path.features, features, dir_tsv, cfg.path.meta, cfg, cfg.process.parallel);
   toc
   fprintf('Building EcoTaxa TSV files... done\n');
+end;
+% 7.2 Consolidate (& Compress)
+if cfg.process.ecotaxa_consolidate
   fprintf('Consolidating EcoTaxa files...\n'); tic;
   dir_export=[cfg.path.ecotaxa 'import_' lower(cfg.process.selection_name) filesep];
   if ~isdir(dir_export); mkdir(dir_export); end;
