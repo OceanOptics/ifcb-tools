@@ -173,14 +173,14 @@ parfor (i_bin=1:size(feature_ids,1), parfor_arg)
   switch sample_type
     case 'inline'
       if strcmp(global_metadata.process.selection_name, 'All')
-        sample_id = [global_metadata.meta.cruise_id '_INLINE_' object_id];
+        sample_id = [global_metadata.meta.cruise_id '_INLINE_' bin_id];
       else
-        sample_id = [global_metadata.meta.cruise_id '_INLINE_' global_metadata.process.selection_name '_' object_id];
+        sample_id = [global_metadata.meta.cruise_id '_INLINE_' global_metadata.process.selection_name '_' bin_id];
       end;
     case 'niskin'
-      sample_id = [sample_profile_id '_NISKIN_' sample_niskin '_' object_id];
+      sample_id = [sample_profile_id '_NISKIN_' sample_niskin '_' bin_id];
     case 'incubation'
-      sample_id = [sample_profile_id '_EXPERIMENT_' sample_experiment_bottle '_' object_id];
+      sample_id = [sample_profile_id '_EXPERIMENT_' sample_experiment_bottle '_' bin_id];
     otherwise
       fprintf(['Unknow sample_type ' bin_id ' in metadata.csv\n']);
   end
