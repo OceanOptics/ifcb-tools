@@ -1,10 +1,12 @@
 % easyIFCB
 % Export IFCB raw data to png images and .tsv files compatible with EcoTaxa
 %   Run the following steps:
-%       1. Blobs extraction
-%       2. Features extraction
-%       3. Images extraction
-%       4. Build TSV file for ecotaxa
+%       1,2. Load configuration and library
+%       3. Blobs extraction
+%       4. Features extraction
+%       5. Run Classification
+%       6. Images extraction
+%       7. Export to EcoTaxa
 % author: Nils Haentjens <nils.haentjens+ifcb@maine.edu>
 % created: May 21, 2016
 % Acknowledge: Pierre-Luc Grandin and Heidi M. Sosik
@@ -14,7 +16,7 @@ close('all');
 clc();
 
 % Set location of configuration file
-cfg.filename = 'cfg/NAAMES01.cfg';
+cfg.filename = 'default.cfg';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%  No modifications needed below here  %%%%%%%%%%%%%%%%%%%
@@ -52,7 +54,7 @@ if cfg.process.blobs
     f = fopen([cfg.path.selection cfg.process.selection]);
     bins = textscan(f, '%s'); bins = bins{1};
     fclose(f);
-  end;
+  end
   bins=regexprep(bins, '.roi', '');
   dir_in=repmat(cellstr(cfg.path.in),size(bins,1),1);
   dir_out=repmat(cellstr(cfg.path.blobs),size(bins,1),1);
@@ -62,11 +64,12 @@ if cfg.process.blobs
   toc
   fprintf('Extraction of blobs done\n');
   clearvars('-except', 'cfg');
-end;
+end
 
 %% 4. Features extraction
 if cfg.process.features
   fprintf('Extracting features of '); tic;
+  % List bins
   if strcmp(cfg.process.selection, 'all')
     bins=dir([cfg.path.in 'D*.roi']);
     bins={bins(:).name}';
@@ -76,6 +79,15 @@ if cfg.process.features
     fclose(f);
   end;
   bins=regexprep(bins, '.roi', '');
+  % Skip bins already processed
+  bin2rm = [];
+  for i=1:size(bins,1)
+    if exist([ cfg.path.features bins{i} '_fea_v2.csv'],'file')
+      fprintf('%s extract_features SKIPPING %s\n', utcdate(now()), bins{i});
+      bin2rm(end+1) = i;
+    end
+  end
+  bins(bin2rm) = [];
   fprintf('%d bin(s)... \n', size(bins,1));
   dir_in_raw=repmat(cellstr(cfg.path.in),size(bins,1),1);
   dir_in_blob=repmat(cellstr(cfg.path.blobs),size(bins,1),1);
@@ -85,7 +97,7 @@ if cfg.process.features
   toc
   fprintf('Extraction of features done\n');
   clearvars('-except', 'cfg');
-end;
+end
 
 %% 5. Run Classification
 if cfg.process.classification
@@ -98,15 +110,15 @@ if cfg.process.classification
     features = textscan(f, '%s'); features = features{1};
     features = cellfun(@(c)[c '_fea_v2.csv'],features,'uni',false);
     fclose(f);
-  end;
+  end
   fprintf('%d bin(s)... \n', size(features,1));
   dir_out=cfg.path.classified;
-  if ~isdir(dir_out); mkdir(dir_out); end;
+  if ~isdir(dir_out); mkdir(dir_out); end
   batch_classify( cfg.path.features, features, dir_out, cfg.path.classifier, cfg.process.parallel);
   toc
   fprintf('Extraction of features done\n');
   clearvars('-except', 'cfg');
-end;
+end
 
 %% 6. Images extraction
 if cfg.process.images
@@ -119,7 +131,7 @@ if cfg.process.images
     f = fopen([cfg.path.selection cfg.process.selection]);
     bins = textscan(f, '%s'); bins = bins{1};
     fclose(f);
-  end;
+  end
   bins=regexprep(bins, '.roi', '');
   
   scale_bar.pixel_per_micron = cfg.meta.resolution_pixel_per_micron;  % ratio
@@ -128,7 +140,7 @@ if cfg.process.images
   % Parallel processing is not accelerating the process as it's mainly the
   % harddrive/SSD reading and writting.
   if cfg.process.parallel; parfor_arg = Inf;
-  else; parfor_arg = 0; end;
+  else; parfor_arg = 0; end
   parfor (i=1:size(bins,1), parfor_arg)
 %   for i=1:size(bins,1)
     bin_out = [dir_out bins{i}];
@@ -139,15 +151,15 @@ if cfg.process.images
         fprintf('%s export_png EXTRACTING %s ...\n', utcdate(now()), bins{i});
       else
         fprintf('%s export_png EXTRACTING %s ... ', utcdate(now()), bins{i});
-      end;
+      end
       export2PNGWithScaleBar([cfg.path.in bins{i}], bin_out, [], scale_bar);
-      if ~cfg.process.parallel; fprintf('DONE\n'); end;
-    end;
-  end;
+      if ~cfg.process.parallel; fprintf('DONE\n'); end
+    end
+  end
   toc
   fprintf('Extraction of images done\n');
   clearvars('-except', 'cfg');
-end;
+end
 
 %% 7. Export to EcoTaxa
 % 7.1 Build EcoTaxa TSV file
@@ -162,20 +174,20 @@ if cfg.process.ecotaxa_tsv
     bins = textscan(f, '%s'); bins = bins{1};
     features = cellfun(@(c)[c '_fea_v2.csv'],bins,'uni',false);
     fclose(f);
-  end;
+  end
   fprintf('%d bin(s)... \n', size(features,1));
   dir_tsv=[cfg.path.ecotaxa 'tsv' filesep];
-  if ~isdir(dir_tsv); mkdir(dir_tsv); end;
+  if ~isdir(dir_tsv); mkdir(dir_tsv); end
   buildEcoTaxaTSV( cfg.path.features, features, dir_tsv, cfg.path.meta, cfg, cfg.process.parallel);
   toc
   fprintf('Building EcoTaxa TSV files... done\n');
-end;
+end
 % 7.2 Consolidate (& Compress) for EcoTaxa
 if cfg.process.ecotaxa_consolidate
   fprintf('Consolidating EcoTaxa files...\n'); tic;
   dir_export=[cfg.path.ecotaxa 'import_' lower(cfg.process.selection_name) filesep];
-  if ~isdir(dir_export); mkdir(dir_export); end;
+  if ~isdir(dir_export); mkdir(dir_export); end
   consolidateForEcoTaxa(cfg.path.images, dir_tsv, bins, dir_export, cfg.process.ecotaxa_zip, cfg.process.ecotaxa_rm_tmp, cfg.process.parallel);
   fprintf('Consolidating EcoTaxa files... done\n');
   toc
-end;
+end
