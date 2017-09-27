@@ -2,7 +2,8 @@ function consolidateForEcotaxa(dir_image, dir_tsv, bins, dir_out, zip_flag, rm_t
 % CONSOLIDATEFORECOTAXA consolidate images and ecotaxa_*.tsv file in one
 % folder and compress them if necessary
 
-if nargin < 6; zip_flag = false; end;
+if nargin < 5; zip_flag = false; end;
+if nargin < 6; rm_tmp_flag = false; end;
 if nargin < 7; par_flag = false; end;
 
 % Check parallel flag
