@@ -56,8 +56,8 @@ for count = 1:length(ROInumbers)
 %     if length(img) > 0
     if ~isempty(img)
         imwrite(uint8(img), fullfile(outputpath, pngname));
-    end;
-end;
+    end
+end
 fclose(fid);
 
 end

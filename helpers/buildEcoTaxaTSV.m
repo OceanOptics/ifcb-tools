@@ -1,4 +1,4 @@
-function buildEcoTaxaTSV(dir_features, feature_ids, dir_adc, adc_ids, dir_out, path_metadata, global_metadata, par_flag)
+function buildEcoTaxaTSV(dir_features, dir_adc, bin_ids, dir_out, path_metadata, global_metadata, par_flag)
 % buildEcoTaxaTSV build tsv file for EcoTaxa
 %   one tsv file is built by bin
 
@@ -17,7 +17,7 @@ bin_metadata = textscan(f, '%s %f %f %f %f %d %s %s %s', 'Delimiter', ',', 'Empt
 fclose(f);
 
 % Load features names for header
-f = fopen([dir_features feature_ids{1}], 'r');
+f = fopen([dir_features bin_ids{1} '_fea_v2.csv'], 'r');
 ftr_headers = textscan(f, '%s', 1);
 fclose(f);
 ftr_headers = strsplit(ftr_headers{1}{1}, ',')';
@@ -93,7 +93,7 @@ process_time = global_metadata.process.time;
 sample_cruise = global_metadata.meta.cruise;
 sample_vessel = global_metadata.meta.vessel;
 % Loop throught all bins given
-bin_ids = cellfun(@(c)c(1:end-11),feature_ids,'uni',false);
+% bin_ids = cellfun(@(c)c(1:end-11),feature_ids,'uni',false);
 
 % Check parallel flag
 if ~exist('par_flag', 'var'); par_flag = false; end;
@@ -101,11 +101,11 @@ if par_flag; parfor_arg = Inf;
 else; parfor_arg = 0; end;
 
 % Loop through each bin
-for i_bin=1:size(feature_ids,1)
+for i_bin=1:size(bin_ids,1)
 % parfor (i_bin=1:size(feature_ids,1), parfor_arg)
   % Get ids
-  feature_id = feature_ids{i_bin};
-  adc_id = adc_ids{i_bin};
+  feature_id = [bin_ids{i_bin} '_fea_v2.csv'];
+  adc_id = [bin_ids{i_bin} '.adc'];
   bin_id = bin_ids{i_bin};
   filename_out = [dir_out 'ecotaxa_' bin_id '.tsv'];
   if exist(filename_out, 'file')
@@ -121,6 +121,7 @@ for i_bin=1:size(feature_ids,1)
   
   % Load features
   if exist([dir_features feature_id], 'file');
+    fprintf('Loading %s\n', feature_id);
     ftr = dlmread([dir_features feature_id], ',', 1, 0);
   else
     fprintf('%s build_tsv EMPTY FEATURES %s >>> SKIPPING \n', utcdate(now()), bin_id);
@@ -130,10 +131,19 @@ for i_bin=1:size(feature_ids,1)
   % Load adc
   % WARNING: USe ROI# to be in sync with features
   %      ex: adc(ftr(i,1),j); % i = ROI#, j = feature
-  if exist([dir_adc adc_id], 'file')
-    adc = dlmread([dir_adc adc_id], ',');
+  foo = [dir_adc adc_id];
+  if exist(foo, 'file')
+    % Check if file is not empty
+    s = dir(foo);
+    if s.bytes ~= 0
+      fprintf('Loading %s\n', adc_id);
+      adc = dlmread(foo, ',');
+    else
+      fprintf('%s build_tsv EMPTY ADC %s >>> SKIPPING \n', utcdate(now()), bin_id);
+      continue;
+    end
   else
-    fprintf('%s build_tsv EMPTY ADC %s >>> SKIPPING \n', utcdate(now()), bin_id);
+    fprintf('%s build_tsv NO ADC %s >>> SKIPPING \n', utcdate(now()), bin_id);
     continue;
   end
   
