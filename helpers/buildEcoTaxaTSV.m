@@ -36,7 +36,7 @@ adc_headers = {'pmt_scattering'; 'pmt_fluorescence'; 'peak_scattering'; 'peak_fl
 adc_sel = [3,4,7,8];
 
 % Set header
-meta_headers = {{'img_file_name', '[t]'},... % 'img_rank', '[f]'},...
+meta_headers_with_location = {{'img_file_name', '[t]'},... % 'img_rank', '[f]'},...
   {'object_id', '[t]'}, {'object_link', '[t]'},...
   {'object_lat', '[f]'}, {'object_lon', '[f]'},...
   {'object_date', '[t]'}, {'object_time', '[t]'},...
@@ -66,15 +66,26 @@ meta_headers = {{'img_file_name', '[t]'},... % 'img_rank', '[f]'},...
   % {'object_annotation_date', '[t]'}, {'object_annotation_time', '[t]'},...
   % {'object_annotation_category', '[t]'}, {'object_annotation_person_name', '[t]'},...
   % {'object_annotation_person_email', '[t]'}, {'object_annotation_status', '[t]'},...
-header_name = [cell2mat(cellfun(@(x) [x{1} '\t'], meta_headers, 'uni', false)) ...
+meta_headers_without_location = {meta_headers_with_location{[1:3 6:end]}};
+header_name_with_location = [cell2mat(cellfun(@(x) [x{1} '\t'], meta_headers_with_location, 'uni', false)) ...
                cell2mat(cellfun(@(x) ['object_' x '\t'], ftr_headers, 'uni', false)') ...
                cell2mat(cellfun(@(x) ['object_' x '\t'], adc_headers, 'uni', false)')];
-header_name = header_name(1:end-2);
-header_type = [cell2mat(cellfun(@(x) [x{2} '\t'], meta_headers, 'uni', false)) ...
+header_name_with_location = header_name_with_location(1:end-2);
+header_type_with_location = [cell2mat(cellfun(@(x) [x{2} '\t'], meta_headers_with_location, 'uni', false)) ...
                repmat('[f]\t',1,size(ftr_headers,1)) ...
                repmat('[f]\t',1,size(adc_headers,1))];
-header_type = header_type(1:end-2);
-header = [header_name '\n' header_type '\n'];
+header_type_with_location = header_type_with_location(1:end-2);
+header_with_location = [header_name_with_location '\n' header_type_with_location '\n'];
+
+header_name_without_location = [cell2mat(cellfun(@(x) [x{1} '\t'], meta_headers_without_location, 'uni', false)) ...
+               cell2mat(cellfun(@(x) ['object_' x '\t'], ftr_headers, 'uni', false)') ...
+               cell2mat(cellfun(@(x) ['object_' x '\t'], adc_headers, 'uni', false)')];
+header_name_without_location = header_name_without_location(1:end-2);
+header_type_without_location = [cell2mat(cellfun(@(x) [x{2} '\t'], meta_headers_without_location, 'uni', false)) ...
+               repmat('[f]\t',1,size(ftr_headers,1)) ...
+               repmat('[f]\t',1,size(adc_headers,1))];
+header_type_without_location = header_type_without_location(1:end-2);
+header_without_location = [header_name_without_location '\n' header_type_without_location '\n'];
 
 % Prepare metadata for each roi
 object_link = global_metadata.meta.website;
@@ -98,11 +109,11 @@ sample_vessel = global_metadata.meta.vessel;
 % Check parallel flag
 if ~exist('par_flag', 'var'); par_flag = false; end;
 if par_flag; parfor_arg = Inf;
-else; parfor_arg = 0; end;
+else; parfor_arg = 0; end
 
 % Loop through each bin
-for i_bin=1:size(bin_ids,1)
-% parfor (i_bin=1:size(feature_ids,1), parfor_arg)
+% for i_bin=1:size(bin_ids,1)
+parfor (i_bin=1:size(bin_ids,1), parfor_arg)
   % Get ids
   feature_id = [bin_ids{i_bin} '_fea_v2.csv'];
   adc_id = [bin_ids{i_bin} '.adc'];
@@ -120,8 +131,7 @@ for i_bin=1:size(bin_ids,1)
   i_bm = find(strcmp(bin_metadata{1}, bin_id));
   
   % Load features
-  if exist([dir_features feature_id], 'file');
-    fprintf('Loading %s\n', feature_id);
+  if exist([dir_features feature_id], 'file')
     ftr = dlmread([dir_features feature_id], ',', 1, 0);
   else
     fprintf('%s build_tsv EMPTY FEATURES %s >>> SKIPPING \n', utcdate(now()), bin_id);
@@ -136,7 +146,6 @@ for i_bin=1:size(bin_ids,1)
     % Check if file is not empty
     s = dir(foo);
     if s.bytes ~= 0
-      fprintf('Loading %s\n', adc_id);
       adc = dlmread(foo, ',');
     else
       fprintf('%s build_tsv EMPTY ADC %s >>> SKIPPING \n', utcdate(now()), bin_id);
@@ -158,7 +167,7 @@ for i_bin=1:size(bin_ids,1)
   else
     object_depth_min = '';
     object_depth_max = '';
-  end;
+  end
 %   sample_type = bin_metadata{7}{i_bm};
   sample_source = bin_metadata{7}{i_bm};
 %   sample_flag = '';
@@ -220,6 +229,8 @@ for i_bin=1:size(bin_ids,1)
           sample_experiment_nutrients = bar{2};
         case 'species'
           sample_culture_species = bar{2};
+        case 'blank'
+          sample_reference = ['blank ' bar{2}]; % Overwrite sample reference
 %         case 'bottle_id'
 %           sample_experiment_bottle = bar{2};
         otherwise
@@ -266,30 +277,35 @@ for i_bin=1:size(bin_ids,1)
   end
 
   % Open TSV file
-  f = fopen([dir_out 'ecotaxa_' bin_id '.tsv'], 'w');
+  f = fopen([dir_out 'ecotaxa_' bin_id '.tsv'], 'W'); % capital W -> no flushing
 
   % Write TSV file header
-  fprintf(f, header);
+  if ~strcmp(object_lat,'NaN') && ~strcmp(object_lon, 'NaN')
+    fprintf(f, header_with_location);
+  else
+    fprintf(f, header_without_location);
+  end
   
-  % Loop through all roi of bin
-  for i=1:size(ftr,1)
-    object_id = sprintf('%s_%05d', bin_id, ftr(i,1));
-    img_file_name = [object_id '.png'];
-    
-    % Write metadata
-    fprintf(f, '%s\t', img_file_name, object_id, object_link, object_lat, object_lon,...
-              object_date, object_time, object_depth_min, object_depth_max,...
-              acq_id, acq_instrument, num2str(acq_resolution_pixel_to_micron),...
-              process_id, process_soft, process_soft_version,...
-              process_script, process_script_version,...
-              process_library, process_library_version,...
-              process_date, process_time,...
-              sample_id, sample_source, sample_flag,...% NAAMES 3 Specific
-              sample_cruise, sample_vessel, sample_reference,...
-              sample_station, sample_cast, sample_source_id,...
-              sample_experiment_state, sample_experiment_dilution,...
-              sample_experiment_light_level, sample_experiment_nutrients,...
-              sample_culture_species);
+  % Prepare metadata for file
+  % Write metadata
+  metadata = sprintf('%s\t', object_link);
+  % Put object_lat and object_lon column only if there is a known location
+  %   leaving the NaN values in those column will make EcoTaxa crash during import
+  if ~strcmp(object_lat,'NaN') && ~strcmp(object_lon, 'NaN')
+    metadata = [metadata sprintf('%s\t', object_lat, object_lon)];
+  end
+  metadata = [metadata sprintf('%s\t', object_date, object_time, object_depth_min, object_depth_max,...
+            acq_id, acq_instrument, num2str(acq_resolution_pixel_to_micron),...
+            process_id, process_soft, process_soft_version,...
+            process_script, process_script_version,...
+            process_library, process_library_version,...
+            process_date, process_time,...
+            sample_id, sample_source, sample_flag,...% NAAMES 3 Specific
+            sample_cruise, sample_vessel, sample_reference,...
+            sample_station, sample_cast, sample_source_id,...
+            sample_experiment_state, sample_experiment_dilution,...
+            sample_experiment_light_level, sample_experiment_nutrients,...
+            sample_culture_species)];
 %               sample_id, sample_source, sample_flag,...% PEACETIME Specific
 %               sample_cruise, sample_vessel, sample_reference,...
 %               sample_station, sample_cast, sample_source_id);
@@ -300,6 +316,14 @@ for i_bin=1:size(bin_ids,1)
 %               sample_concentration, sample_experiment_dilution,...
 %               sample_experiment_state, sample_experiment_bottle);
 
+  % Loop through all roi of bin
+  for i=1:size(ftr,1)
+    object_id = sprintf('%s_%05d', bin_id, ftr(i,1));
+    img_file_name = [object_id '.png'];
+    
+    % Write metadata
+    fprintf(f, '%s\t%s\t%s', img_file_name, object_id, metadata);
+    
     % Write features
     for j=1:size(ftr,2)%-1
       fprintf(f, '%s\t', num2str(ftr(i, j)));
