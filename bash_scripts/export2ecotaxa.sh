@@ -4,11 +4,11 @@
 # created: January 24, 2017
 
 # Set directory of ecotaxa tsv files
-DIR_TSV=(~/Documents/MATLAB/IFCB/training_test_data/ecotaxa/tsv/*(.))
+DIR_TSV=(~/Documents/UMaine/Lab/data/NAAMES/02_ifcb/ecotaxa/tsv/*(.))
 # Set directory of ecotaxa images
-DIR_IMG=(~/Documents/MATLAB/IFCB/training_test_data/images/)
+DIR_IMG=(~/Documents/UMaine/Lab/data/NAAMES/02_ifcb/images/)
 # Set directory to compressed data ready for ecotaxa
-DIR_OUT=(~/Documents/MATLAB/IFCB/training_test_data/import/)
+DIR_OUT=(~/Documents/UMaine/Lab/data/NAAMES/02_ifcb/ecotaxa/import/)
 
 mkdir -p $DIR_OUT
 cd $DIR_IMG

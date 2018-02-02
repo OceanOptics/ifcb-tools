@@ -115,14 +115,31 @@ The four first elements are mandatory (bin_id, lat, lon, and depth).
   - longitude <float or NaN> (decimal degree)
   - depth <float or NaN> (meters)
   - concentration factor <float or NaN> (no units)
-  - flag <int or NaN> (1:good, 2:partial sample (not valid for quantification), 4:bad sample)
-  - sample type <string or empty> (inline, niskin, or incubation)
+  - flag <int>
+    0. Not Available
+    1. Good
+    2. Incomplete sample (quantification might be biased)
+    4. Bad
+    8. Questionnable
+    16. Scatter trigger
+    32. Flush
+  - sample type <string or empty>
+    - inline
+    - niskin
+    - incubation
+    - micro-layer
+    - minicosm
+    - test
+    - mooring
+    - beads
   - sample id <string or empty> (CTD cast identification number)
   - comments <string or empty>:
     - it can be any kind of text in lower case without special characters
     - it can be any supplementary field separated by ;
-       - stn_id=##; cast_id=##; niskin_id=##
-       - T0/Tf=##; dillution=###; bottle_id=###
+       - stn_id=##; cast_id=##; source_id=##
+       - experiment_state=##; experiment_dilution=##; experiment_light_level=##
+       - experiment_nutrients=##; experiment_bottle_id=##
+       - culture_species=##
 
 Example of file content:
 
@@ -130,7 +147,7 @@ Example of file content:
     D20160524T120438_IFCB107, 47.6320, -39.0540,  10, 1.0, 1, niskin, AT34023, stn_id=4; cast_id=1; niskin_id=21
     D20160524T124359_IFCB107, 47.6320, -39.0540,   6, 1.0, 1, niskin, AT34023, stn_id=4; cast_id=1; niskin_id=22
     D20160524T134109_IFCB107, 47.6320, -39.0540,   5, 1.0, 1, inline, ,
-    D20160524T140437_IFCB107, 47.6310, -39.0530, NaN, NaN, 1, incubation, AT34020, T0/Tf=Tf; dillution=100; bottle_id=5
-    D20160524T143158_IFCB107, 47.6290, -39.0530, NaN, NaN, 1, incubation, AT34020, T0/Tf=Tf; dillution=20; bottle_id=5
+    D20160524T140437_IFCB107, 47.6310, -39.0530, NaN, NaN, 1, incubation, AT34020, experiment_state=Tf; experiment_dilution=100; experiment_bottle_id=5
+    D20160524T143158_IFCB107, 47.6290, -39.0530, NaN, NaN, 1, incubation, AT34020, experiment_state=Tf; experiment_dilution=20; experiment_bottle_id=5
 
 
