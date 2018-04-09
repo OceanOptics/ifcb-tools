@@ -116,13 +116,18 @@ The four first elements are mandatory (bin_id, lat, lon, and depth).
   - depth <float or NaN> (meters)
   - concentration factor <float or NaN> (no units)
   - flag <int>
-    0. Not Available
-    1. Good
-    2. Incomplete sample (quantification might be biased)
-    4. Bad
-    8. Questionnable
-    16. Scatter trigger
-    32. Flush
+    - 0    Not Available
+    - 2^0  Good
+    - 2^1  Aborted | Incomplete (quantification can be biased)
+    - 2^2  Bad | Ignore | Delete | Failed | Bubbles
+    - 2^3  Questionnable
+    - 2^4  customTrigger: Trigger mode different than PMTB
+    - 2^5  Flush
+    - 2^6  customVolume: Volume sample different than 5 mL
+    - 2^7  badAlignment (can underestimate #/cell)
+    - 2^8  badFocus (bad focus)
+    - 2^9  timeOffset: time of IFCB is incorrect
+    - 2^10 Corrupted (good sample, bad file)
   - sample type <string or empty>
     - inline
     - niskin
@@ -132,6 +137,7 @@ The four first elements are mandatory (bin_id, lat, lon, and depth).
     - test
     - mooring
     - beads
+    - ali6000
   - sample id <string or empty> (CTD cast identification number)
   - comments <string or empty>:
     - it can be any kind of text in lower case without special characters
