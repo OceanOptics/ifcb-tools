@@ -47,12 +47,16 @@ meta_headers = {{'img_file_name', '[t]'},... % 'img_rank', '[f]'},...
   {'process_script', '[t]'}, {'process_script_version', '[t]'},...
   {'process_library', '[t]'}, {'process_library_version', '[t]'},...
   {'process_date', '[t]'}, {'process_time', '[t]'},...
-  {'sample_id', '[t]'}, {'sample_source', '[t]'}, {'sample_flag', '[t]'},... % NAAMES 3 Specific from here
+  {'sample_id', '[t]'}, {'sample_source', '[t]'}, {'sample_flag', '[t]'},... % EXPORTS Specific from here
   {'sample_cruise', '[t]'}, {'sample_vessel', '[t]'}, {'sample_reference', '[t]'},...
   {'sample_station', '[t]'}, {'sample_cast', '[f]'}, {'sample_source_id', '[t]'},...
-  {'sample_experiment_state', '[t]'}, {'sample_experiment_dilution', '[t]'},...
-  {'sample_experiment_light_level', '[t]'}, {'sample_experiment_nutrients', '[t]'},...
-  {'sample_culture_species', '[t]'}};
+  {'sample_culture_species', '[t]'}, {'sample_concentration', '[f]'}};
+  % {'sample_id', '[t]'}, {'sample_source', '[t]'}, {'sample_flag', '[t]'},... % NAAMES 3 Specific from here
+  % {'sample_cruise', '[t]'}, {'sample_vessel', '[t]'}, {'sample_reference', '[t]'},...
+  % {'sample_station', '[t]'}, {'sample_cast', '[f]'}, {'sample_source_id', '[t]'},...
+  % {'sample_experiment_state', '[t]'}, {'sample_experiment_dilution', '[t]'},...
+  % {'sample_experiment_light_level', '[t]'}, {'sample_experiment_nutrients', '[t]'},...
+  % {'sample_culture_species', '[t]'}};
 %   {'sample_id', '[t]'}, {'sample_source', '[t]'}, {'sample_flag', '[t]'},... % PEACETIME Specific from here
 %   {'sample_cruise', '[t]'}, {'sample_vessel', '[t]'}, {'sample_reference', '[t]'},...
 %   {'sample_station', '[t]'}, {'sample_cast', '[f]'}, {'sample_source_id', '[t]'}};
@@ -162,37 +166,19 @@ parfor (i_bin=1:size(bin_ids,1), parfor_arg)
   end
 %   sample_type = bin_metadata{7}{i_bm};
   sample_source = bin_metadata{7}{i_bm};
-%   sample_flag = '';
-  switch bin_metadata{6}(i_bm)
-    case 0
-      sample_flag = 'NA';
-    case 1
-      sample_flag = 'good';
-    case 2
-      sample_flag = 'incomplete';
-    case 4
-      sample_flag = 'bad';
-    case 8
-      sample_flag = 'questionnable';
-    case 16
-      sample_flag = 'scatter trigger';
-    case 32
-      sample_flag = 'flush';
-    otherwise
-      fprintf(['Unknow flag ' bin_id ' in metadata.csv\n']);
-      sample_flag = 'unknow';
-  end;
+  sample_flag = flagGet(bin_metadata{6}(i_bm));
 %   sample_profile_id = bin_metadata{8}{i_bm};
   sample_reference = bin_metadata{8}{i_bm};
   sample_station = '';
   sample_cast = '';
 %   sample_niskin = '';
   sample_source_id = '';
-%   if ~isnan(bin_metadata{5}(i_bm)); sample_concentration = num2str(bin_metadata{5}(i_bm)); else sample_concentration = ''; end;
-  sample_experiment_state = '';
-  sample_experiment_dilution = '';
-  sample_experiment_light_level = '';
-  sample_experiment_nutrients = '';
+  sample_concentration = bin_metadata{5}(i_bm);
+  % if ~isnan(bin_metadata{5}(i_bm)); sample_concentration = num2str(bin_metadata{5}(i_bm)); else sample_concentration = ''; end;
+  % sample_experiment_state = '';
+  % sample_experiment_dilution = '';
+  % sample_experiment_light_level = '';
+  % sample_experiment_nutrients = '';
 %   sample_experiment_bottle = '';
   sample_culture_species = '';
   
@@ -260,6 +246,8 @@ parfor (i_bin=1:size(bin_ids,1), parfor_arg)
       end
     case 'PIC'
       sample_id = [global_metadata.meta.cruise_id '_PIC_' sample_reference '_' bin_id];
+    case 'ali6000'
+      sample_id = [global_metadata.meta.cruise_id '_ALI6000_S' sample_station '_' bin_id];
     case 'culture'
       sample_id = ['CULTURE_' sample_culture_species '_' bin_id];
     case 'minicosm'
@@ -270,6 +258,8 @@ parfor (i_bin=1:size(bin_ids,1), parfor_arg)
       sample_id = [sample_reference '_MOORING_' bin_id];
     case 'beads'
       sample_id = ['BEADS_' bin_id];
+    case 'towfish'
+      sample_id = ['TOWFISH_' sample_reference '_' bin_id];
     otherwise
       fprintf(['Unknow sample_source ' bin_id ' in metadata.csv\n']);
       sample_id = bin_id;
@@ -288,12 +278,16 @@ parfor (i_bin=1:size(bin_ids,1), parfor_arg)
             process_script, process_script_version,...
             process_library, process_library_version,...
             process_date, process_time,...
-            sample_id, sample_source, sample_flag,...% NAAMES 3 Specific
+            sample_id, sample_source, sample_flag,...% EXPORTS Specific
             sample_cruise, sample_vessel, sample_reference,...
             sample_station, sample_cast, sample_source_id,...
-            sample_experiment_state, sample_experiment_dilution,...
-            sample_experiment_light_level, sample_experiment_nutrients,...
-            sample_culture_species);
+            sample_culture_species, sample_concentration);
+            % sample_id, sample_source, sample_flag,...% NAAMES 3 Specific
+            % sample_cruise, sample_vessel, sample_reference,...
+            % sample_station, sample_cast, sample_source_id,...
+            % sample_experiment_state, sample_experiment_dilution,...
+            % sample_experiment_light_level, sample_experiment_nutrients,...
+            % sample_culture_species);
 %               sample_id, sample_source, sample_flag,...% PEACETIME Specific
 %               sample_cruise, sample_vessel, sample_reference,...
 %               sample_station, sample_cast, sample_source_id);

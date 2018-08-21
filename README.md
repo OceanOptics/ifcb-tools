@@ -70,11 +70,17 @@ please check the chapter 1 and 2 of this [book](https://git-scm.com/book/en/v2))
     git clone https://github.com/hsosik/ifcb-analysis.git
 
 IFCB_analysis evolves very quickly thereafter if the latest version of the
-code does not run please download the version `e9e37998a8bb8caf587b19418202b650ba0b99f2` of the toolbox:
+code does not run please download the version `99fba006ccb0510fc5add4664e93a6b8d9d05584`
+(previous version tested: `e9e37998a8bb8caf587b19418202b650ba0b99f2`) of the toolbox:
 
     git clone https://github.com/hsosik/ifcb-analysis.git <my_repository>
     cd <my_repository>
-    git reset --hard e9e37998a8bb8caf587b19418202b650ba0b99f2
+    git reset --hard 99fba006ccb0510fc5add4664e93a6b8d9d05584
+
+To get the revision number (sha1) of the code your have:
+  
+    cd IFCB_analysis
+    git rev-parse HEAD
 
 IFCB_analysis toolbox requires:
   - the file `/ifcb-analysis/feature_extraction/ModHausdorffDistMex.cpp`
@@ -116,16 +122,16 @@ The four first elements are mandatory (bin_id, lat, lon, and depth).
   - depth <float or NaN> (meters)
   - concentration factor <float or NaN> (no units)
   - flag <int>
-    - 0    Not Available
+    - 0    Flag not available
     - 2^0  Good
     - 2^1  Aborted | Incomplete (quantification can be biased)
     - 2^2  Bad | Ignore | Delete | Failed | Bubbles
     - 2^3  Questionnable
     - 2^4  customTrigger: Trigger mode different than PMTB
     - 2^5  Flush
-    - 2^6  customVolume: Volume sample different than 5 mL
-    - 2^7  badAlignment (can underestimate #/cell)
-    - 2^8  badFocus (bad focus)
+    - 2^6  customVolume: Volume sampled different than 5 mL
+    - 2^7  badAlignment (can underestimate concentration)
+    - 2^8  badFocus (area of particles is affected)
     - 2^9  timeOffset: time of IFCB is incorrect
     - 2^10 Corrupted (good sample, bad file)
   - sample type <string or empty>

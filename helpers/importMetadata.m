@@ -19,7 +19,8 @@ type = bin_metadata{7};
 ref = bin_metadata{8};
 
 % Load comments in table
-stn_id = NaN(size(bin_metadata{1}));
+% stn_id = NaN(size(bin_metadata{1})); % number
+stn_id = cell(size(bin_metadata{1}));  % string
 cast_id = NaN(size(bin_metadata{1}));
 source_id = NaN(size(bin_metadata{1}));
 experiment_state = cell(size(bin_metadata{1}));
@@ -35,7 +36,8 @@ for i=1:size(bin_metadata{9},1)
     if length(bar) == 2
       switch strtrim(bar{1})
         case 'stn_id'
-          stn_id(i) = str2double(bar{2});
+%           stn_id(i) = str2double(bar{2});
+          stn_id{i} = bar{2};
         case 'cast_id' 
           cast_id(i) = str2double(bar{2});
         case {'source_id', 'niskin_id'}

@@ -17,7 +17,6 @@ addpath([cfg.path.ifcb_analysis 'IFCB_tools' filesep])
 if cfg.process.parallel; parfor_arg = Inf; else; parfor_arg = 0; end
 fprintf('Done\n');
 
-
 %% Get features
 fprintf('Importing features ... ');  tic;% ~2 min
 ftr_bins=dir([cfg.path.features 'D*_fea_v2.csv']);
@@ -53,19 +52,30 @@ end
 fprintf('Done\n'); toc;
 
 %% Compute additional features
+% For each individual sample
 foo2=cell(n,1);
 parfor (i=1:n, parfor_arg)
-  % add_ftr columns: 1 ESD from Area  2 ESD from Biovolume  3 Perimeter / Area
-  foo2{i} = [sqrt(4/pi * foo{i}(:,1)), (6/pi .* foo{i}(:,2)) .^ (1/3), foo{i}(:,8) ./ foo{i}(:,1)];
+% for i=1:n
+  % add_ftr columns: 1 ESD from Area      2 ESD from Biovolume 
+  %                  3 Perimeter / Area
+  foo2{i} = [sqrt(4/pi * foo{i}(:,1)), (6/pi .* foo{i}(:,2)) .^ (1/3),...
+             foo{i}(:,8) ./ foo{i}(:,1)];
 end
-ftr_add =table(cell(n,1), cell(n,1), cell(n,1), 'VariableNames',...
-               {'ESDA', 'ESDV', 'PA'});
-ftr_add.Properties.VariableUnits = {'pixels', 'pixels', '1/pixels'};
+ftr_add =table(cell(n,1), cell(n,1), cell(n,1), NaN(n,1), 'VariableNames',...
+               {'ESDA', 'ESDV', 'PA', 'PSDSlope'});
+ftr_add.Properties.VariableUnits = {'pixels', 'pixels', '1/pixels', 'None'};
 for i=1:n
 ftr_add.ESDA{i} = foo2{i}(:,1);
 ftr_add.ESDV{i} = foo2{i}(:,2);
 ftr_add.PA{i} = foo2{i}(:,3);
 end
+% For each bin
+pixel2um = cfg.meta.resolution_pixel_per_micron;
+foo = NaN(n,1);
+parfor (i=1:n, parfor_arg)
+  foo(i) = find_psd_slope(foo2{i}(:,2) / pixel2um);
+end
+ftr_add.PSDSlope = foo;
 
 %% Get hdr data
 fprintf('Importing header ... ');  tic;% ~2 min
@@ -117,6 +127,7 @@ end
 fprintf('Done\n'); toc;
 
 %% Get metadata
+fprintf('EDIT importMetadata TO GET stn_id AS number or string.\n');
 md = importMetadata(cfg.path.meta);
 % Sync metadata index on bin
 [~, i] = intersect(md.id, bin);
@@ -157,9 +168,58 @@ col_sel = strcmp(ifcb.Properties.VariableNames, 'dt') | strcmp(ifcb.Properties.V
 ifcb_ctd = ifcb(row_sel, col_sel);
 save([cfg.path.wk 'ifcb_ctd_features.mat'], 'ifcb_ctd');
 
+%% Build table with median and summed Calibrated in-line features
+row_sel = strcmp(ifcb.type,'inline') & ifcb.flag == 1 & ifcb.concentration == 1;
+col_sel = strcmp(ifcb.Properties.VariableNames, 'dt') | ...
+          strcmp(ifcb.Properties.VariableNames, 'lat') | strcmp(ifcb.Properties.VariableNames, 'lon') | ...
+          strcmp(ifcb.Properties.VariableNames, 'stn_id');
+d = ifcb(row_sel, col_sel);
+d.n = cellfun('length', ifcb.Area(row_sel)) / 5;
+d.ESD_avg = cellfun(@(x) nanmedian(x), ifcb.ESDV(row_sel)) * 1/3.4; % form pixels to um
+d.Area_avg = cellfun(@(x) nanmedian(x), ifcb.Area(row_sel)) * 1/3.4^2; % from pixels^2 to um^2
+d.Area_sum = cellfun(@(x) sum(x), ifcb.Area(row_sel)) * 1/3.4^2 * 1e-6^2 * 1/5 * 1e6; % from pixel^2/5 mL to m^2/m^3 = m^-1
+d.Biovolume_avg = cellfun(@(x) nanmedian(x), ifcb.Biovolume(row_sel)) * 1/3.4^3; % from pixels^3 to um^3
+d.Concentration = cellfun(@(x) sum(x), ifcb.Biovolume(row_sel)) * 1/3.4^3 * 1e-6^3 * 1/5 * 1e6; % from pixel^3/5 mL to m^3/m^3 = unitless
+d.PA_avg = cellfun(@(x) nanmean(x), ifcb.PA(row_sel)) * 3.4; % from pixels/pixels^2 to um/um^2
+d.PSDSlope = ifcb.PSDSlope(row_sel);
+d.Properties.VariableUnits = {'Matlab datenum', 'deg N', 'deg E', 'None', '#/mL', 'um', 'um^2', 'um^2', 'um^3', 'm^3/m^3', '1/m', 'None'};
+save([cfg.path.wk 'ifcb_inline_prod.mat'], 'd');
+% writetable(d, [cfg.path.wk 'ifcb_inline_prod.csv']);
+%% Build table with median and summed Calibrated niskin features
+row_sel = strcmp(ifcb.type,'niskin') & ifcb.flag == 1 & ifcb.concentration == 1;
+col_sel = strcmp(ifcb.Properties.VariableNames, 'dt') | ...
+          strcmp(ifcb.Properties.VariableNames, 'lat') | strcmp(ifcb.Properties.VariableNames, 'lon') | ...
+          strcmp(ifcb.Properties.VariableNames, 'stn_id') | strcmp(ifcb.Properties.VariableNames, 'cast_id') |...
+          strcmp(ifcb.Properties.VariableNames, 'source_id') | strcmp(ifcb.Properties.VariableNames, 'depth');
+d = ifcb(row_sel, col_sel);
+d.n = cellfun('length', ifcb.Area(row_sel)) / 5;
+d.ESD_avg = cellfun(@(x) nanmedian(x), ifcb.ESDV(row_sel)) * 1/3.4; % form pixels to um
+d.Area_avg = cellfun(@(x) nanmedian(x), ifcb.Area(row_sel)) * 1/3.4^2; % from pixels^2 to um^2
+d.Area_sum = cellfun(@(x) sum(x), ifcb.Area(row_sel)) * 1/3.4^2 * 1e-6^2 * 1/5 * 1e6; % from pixel^2/5 mL to m^2/m^3 = m^-1
+d.Biovolume_avg = cellfun(@(x) nanmedian(x), ifcb.Biovolume(row_sel)) * 1/3.4^3; % from pixels^3 to um^3
+d.Concentration = cellfun(@(x) sum(x), ifcb.Biovolume(row_sel)) * 1/3.4^3 * 1e-6^3 * 1/5 * 1e6; % from pixel^3/5 mL to m^3/m^3 = unitless
+d.PA_avg = cellfun(@(x) nanmean(x), ifcb.PA(row_sel)) * 3.4; % from pixels/pixels^2 to um/um^2
+d.PSDSlope = ifcb.PSDSlope(row_sel);
+d.Properties.VariableUnits = {'Matlab datenum', 'deg N', 'deg E', 'm', 'None', 'None', 'None', '#/mL', 'um', 'um^2', 'um^2', 'um^3', 'm^3/m^3', '1/m', 'None'};
+save([cfg.path.wk 'ifcb_niskin_prod.mat'], 'd');
+% writetable(d, [cfg.path.wk 'ifcb_niskin_prod.csv']);
 %% Check Volume Sampled
 fig(3); plot(ifcb_inline.dt, ifcb_inline.VolumeSampled);
 datetick();
 ylabel('Volume Sampled (mL)');
-median(ifcb_inline.VolumeSampled)
+median(ifcb_inline.VolumeSampled);
+set(datacursormode(figure(3)),'UpdateFcn',@data_cursor_display_date);
 
+%% Check PSD Slope
+fig(4); plot(ifcb.dt, ifcb.PSDSlope);
+datetick2_doy();
+ylabel('PSD Slope');
+set(datacursormode(figure(4)),'UpdateFcn',@data_cursor_display_date);
+
+fig(5); hold('on');
+for i=1:1565
+  [slope, intercept, psd, bin_means] = find_psd_slope(ifcb.ESDV{i} / pixel2um);
+  x = bin_means(1):bin_means(end);
+  plot(bin_means, psd, 's',x, intercept*(5./x).^slope);
+end
+%% 

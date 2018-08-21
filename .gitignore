@@ -25,6 +25,7 @@ DIPUM/*
 ecotaxa_org/*
 generate_metadata/*
 projects/*
+plots/* 
 
 # Ignore local data
 cfg/*
