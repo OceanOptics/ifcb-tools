@@ -173,8 +173,7 @@ parfor (i_bin=1:size(bin_ids,1), parfor_arg)
   sample_cast = '';
 %   sample_niskin = '';
   sample_source_id = '';
-  sample_concentration = bin_metadata{5}(i_bm);
-  % if ~isnan(bin_metadata{5}(i_bm)); sample_concentration = num2str(bin_metadata{5}(i_bm)); else sample_concentration = ''; end;
+  if ~isnan(bin_metadata{5}(i_bm)); sample_concentration = num2str(bin_metadata{5}(i_bm)); else sample_concentration = ''; end;
   % sample_experiment_state = '';
   % sample_experiment_dilution = '';
   % sample_experiment_light_level = '';
