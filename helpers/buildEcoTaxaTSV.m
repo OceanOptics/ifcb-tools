@@ -259,6 +259,8 @@ parfor (i_bin=1:size(bin_ids,1), parfor_arg)
       sample_id = ['BEADS_' bin_id];
     case 'towfish'
       sample_id = ['TOWFISH_' sample_reference '_' bin_id];
+    case 'zootow'
+      sample_id = ['ZOOTOW_' sample_reference '_' bin_id];
     otherwise
       fprintf(['Unknow sample_source ' bin_id ' in metadata.csv\n']);
       sample_id = bin_id;
