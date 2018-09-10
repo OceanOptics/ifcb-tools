@@ -117,10 +117,10 @@ section path under the attribute meta. The metadata file is a csv
 The four first elements are mandatory (bin_id, lat, lon, and depth).
 
   - bin identification number <D<YYYYMMDD>T<hhmmss>_IFCB<###>>
+  - date & time of sample <YYYY/MM/DD hh:mm:ss or empty if same as bin_id> (UTC)
   - latitude <float or NaN> (decimal degree)
   - longitude <float or NaN> (decimal degree)
   - depth <float or NaN> (meters)
-  - concentration factor <float or NaN> (no units)
   - flag <int>
     - 0    Flag not available
     - 2^0  Good
@@ -144,10 +144,14 @@ The four first elements are mandatory (bin_id, lat, lon, and depth).
     - mooring
     - beads
     - ali6000
-  - sample id <string or empty> (CTD cast identification number)
-  - comments <string or empty>:
+    - towfish
+    - zootow
+    - karen
+  - other <string or empty>:
     - it can be any kind of text in lower case without special characters
     - it can be any supplementary field separated by ;
+       - concentration=###
+       - ref=####
        - stn_id=##; cast_id=##; source_id=##
        - experiment_state=##; experiment_dilution=##; experiment_light_level=##
        - experiment_nutrients=##; experiment_bottle_id=##
@@ -155,11 +159,9 @@ The four first elements are mandatory (bin_id, lat, lon, and depth).
 
 Example of file content:
 
-    D20160524T084849_IFCB107, 47.6530, -39.1180,   5, 1.0, 1, inline, ,
-    D20160524T120438_IFCB107, 47.6320, -39.0540,  10, 1.0, 1, niskin, AT34023, stn_id=4; cast_id=1; niskin_id=21
-    D20160524T124359_IFCB107, 47.6320, -39.0540,   6, 1.0, 1, niskin, AT34023, stn_id=4; cast_id=1; niskin_id=22
-    D20160524T134109_IFCB107, 47.6320, -39.0540,   5, 1.0, 1, inline, ,
-    D20160524T140437_IFCB107, 47.6310, -39.0530, NaN, NaN, 1, incubation, AT34020, experiment_state=Tf; experiment_dilution=100; experiment_bottle_id=5
-    D20160524T143158_IFCB107, 47.6290, -39.0530, NaN, NaN, 1, incubation, AT34020, experiment_state=Tf; experiment_dilution=20; experiment_bottle_id=5
-
-
+    D20160524T084849_IFCB107, , 47.6530, -39.1180,   5.0, 1, inline,
+    D20160524T120438_IFCB107, 2016/05/24 10:30:00, 47.6320, -39.0540,  10.0, 1, niskin, ref=AT34023; stn_id=4; cast_id=1; niskin_id=21
+    D20160524T124359_IFCB107, 2016/05/24 10:30:00, 47.6320, -39.0540,   6.0, 1, niskin, ref=AT34023; stn_id=4; cast_id=1; niskin_id=22
+    D20160524T134109_IFCB107, , 47.6320, -39.0540,   5.0, 1, inline,
+    D20160524T140437_IFCB107, 2016/05/24 14:00:00, 47.6310, -39.0530, NaN, 1, incubation, ref=AT34020; experiment_state=Tf; experiment_dilution=100; experiment_bottle_id=5
+    D20160524T143158_IFCB107, 2016/05/24 14:00:00, 47.6290, -39.0530, NaN, 1, incubation, ref=AT34020; experiment_state=Tf; experiment_dilution=20; experiment_bottle_id=5

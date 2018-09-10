@@ -2,19 +2,23 @@ function buildEcoTaxaTSV(dir_features, dir_adc, bin_ids, dir_out, path_metadata,
 % buildEcoTaxaTSV build tsv file for EcoTaxa
 %   one tsv file is built by bin
 
-% Load metadata.csv
-%   1 bin identification number <D<YYYYMMDD>T<hhmmss>_IFCB<###>>
-%   2 latitude <double> (decimal degree)
-%   3 longitude <double> (decimal degree)
-%   4 depth <double> (meters)
-%   5 concentration factor <double> (no units)
-%   6 flag <int32> (0:NaN, 1:good, 2:partial sample (not valid for quantification), 4:bad sample)
-%   7 sample type <string> (e.g. inline, niskin, or experiment)
-%   8 sample id <string> (CTD cast identification number)
-%   9 comments <string>
-f = fopen(path_metadata, 'r');
-bin_metadata = textscan(f, '%s %f %f %f %f %d %s %s %s', 'Delimiter', ',', 'EmptyValue', NaN);
-fclose(f);
+% % Load metadata.csv
+% %   1 bin identification number <D<YYYYMMDD>T<hhmmss>_IFCB<###>>
+% %   2 latitude <double> (decimal degree)
+% %   3 longitude <double> (decimal degree)
+% %   4 depth <double> (meters)
+% %   5 concentration factor <double> (no units)
+% %   6 flag <int32> (0:NaN, 1:good, 2:partial sample (not valid for quantification), 4:bad sample)
+% %   7 sample type <string> (e.g. inline, niskin, or experiment)
+% %   8 sample id <string> (CTD cast identification number)
+% %   9 comments <string>
+% f = fopen(path_metadata, 'r');
+% bin_metadata = textscan(f, '%s %f %f %f %f %d %s %s %s', 'Delimiter', ',', 'EmptyValue', NaN);
+% fclose(f);
+
+% Load metadata.csv v2 in a table
+bin_metadata = readtable(path_metadata);
+bin_metadata.Properties.VariableNames = {'bin_id', 'dt', 'lat', 'lon', 'depth', 'flag', 'source', 'other'};
 
 % Load features names for header
 f = fopen([dir_features bin_ids{1} '_fea_v2.csv'], 'r');
@@ -33,6 +37,7 @@ end
 
 % Load ADC names for header
 adc_headers = {'pmt_scattering'; 'pmt_fluorescence'; 'peak_scattering'; 'peak_fluorescence'};
+% adc_headers = {'int_scattering'; 'int_fluorescence'; 'peak_scattering'; 'peak_fluorescence'};
 adc_sel = [3,4,7,8];
 
 % Set header
@@ -122,7 +127,7 @@ parfor (i_bin=1:size(bin_ids,1), parfor_arg)
       fprintf('%s build_tsv BUILDING %s ... ', utcdate(now()), bin_id);
     end;
   % Get index in metadata of current bin  
-  i_bm = find(strcmp(bin_metadata{1}, bin_id));
+  i_bm = find(strcmp(bin_metadata.bin_id, bin_id));
   
   % Load features
   if exist([dir_features feature_id], 'file')
@@ -151,29 +156,34 @@ parfor (i_bin=1:size(bin_ids,1), parfor_arg)
   end
   
   % Prepare bin's metadata
-  if isnan(bin_metadata{2}(i_bm)); object_lat = '44.9012018';
-  else; object_lat = num2str(bin_metadata{2}(i_bm)); end
-  if isnan(bin_metadata{3}(i_bm)); object_lon = '-68.6704788';
-  else; object_lon = num2str(bin_metadata{3}(i_bm)); end
-  object_date = bin_id(2:9);
-  object_time = bin_id(11:16);
-  if ~isnan(bin_metadata{4}(i_bm))
-    object_depth_min = num2str(bin_metadata{4}(i_bm));
-    object_depth_max = num2str(bin_metadata{4}(i_bm));
+  % No location is set to UMaine as EcoTaxa do not accept empty lat & lon
+  if isnan(bin_metadata.lat(i_bm)); object_lat = '44.9012018';
+  else; object_lat = num2str(bin_metadata.lat(i_bm)); end
+  if isnan(bin_metadata.lon(i_bm)); object_lon = '-68.6704788';
+  else; object_lon = num2str(bin_metadata.lon(i_bm)); end
+  % No sampling time is set to bin_id as it's probably from inline
+  if isempty(bin_metadata.dt{i_bm}); object_date = bin_id(2:9); object_time = bin_id(11:16);
+  else; object_date = [bin_metadata.dt{i_bm}(1:4) bin_metadata.dt{i_bm}(6:7) bin_metadata.dt{i_bm}(9:10)];
+        object_time = [bin_metadata.dt{i_bm}(11:12) bin_metadata.dt{i_bm}(13:14) bin_metadata.dt{i_bm}(15:16)]; end
+  if ~isnan(bin_metadata.depth(i_bm))
+    object_depth_min = num2str(bin_metadata.depth(i_bm));
+    object_depth_max = num2str(bin_metadata.depth(i_bm));
   else
     object_depth_min = '';
     object_depth_max = '';
   end
 %   sample_type = bin_metadata{7}{i_bm};
-  sample_source = bin_metadata{7}{i_bm};
-  sample_flag = flagGet(bin_metadata{6}(i_bm));
+  sample_source = bin_metadata.source{i_bm};
+  sample_flag = flagGet(bin_metadata.flag(i_bm));
 %   sample_profile_id = bin_metadata{8}{i_bm};
-  sample_reference = bin_metadata{8}{i_bm};
+%   sample_reference = bin_metadata{8}{i_bm};
+  sample_reference = '';
   sample_station = '';
   sample_cast = '';
 %   sample_niskin = '';
   sample_source_id = '';
-  if ~isnan(bin_metadata{5}(i_bm)); sample_concentration = num2str(bin_metadata{5}(i_bm)); else sample_concentration = ''; end;
+%   if ~isnan(bin_metadata{5}(i_bm)); sample_concentration = num2str(bin_metadata{5}(i_bm)); else sample_concentration = ''; end;
+  sample_concentration = '';
   % sample_experiment_state = '';
   % sample_experiment_dilution = '';
   % sample_experiment_light_level = '';
@@ -182,7 +192,7 @@ parfor (i_bin=1:size(bin_ids,1), parfor_arg)
   sample_culture_species = '';
   
   % Load comments in metadata
-  foo = strsplit(bin_metadata{9}{i_bm}, ';');
+  foo = strsplit(bin_metadata.other{i_bm}, ';');
   for bar=foo
     bar = strsplit(bar{1}, '=');
     if length(bar) == 2
@@ -204,12 +214,16 @@ parfor (i_bin=1:size(bin_ids,1), parfor_arg)
           sample_experiment_light_level = bar{2};
         case 'nutrients'
           sample_experiment_nutrients = bar{2};
+%         case 'bottle_id'
+%           sample_experiment_bottle = bar{2};
         case 'species'
           sample_culture_species = bar{2};
         case 'blank'
           sample_reference = ['blank ' bar{2}]; % Overwrite sample reference
-%         case 'bottle_id'
-%           sample_experiment_bottle = bar{2};
+        case 'ref'
+          sample_reference = bar{2};
+        case 'concentration'
+          sample_concentration = bar{2};
         otherwise
           fprintf(['Unknow comment ' bar{1} ' in ' bin_id ' in metadata.csv\n']);
       end
@@ -258,9 +272,11 @@ parfor (i_bin=1:size(bin_ids,1), parfor_arg)
     case 'beads'
       sample_id = ['BEADS_' bin_id];
     case 'towfish'
-      sample_id = ['TOWFISH_' sample_reference '_' bin_id];
+      sample_id = [global_metadata.meta.cruise_id '_TOWFISH_' sample_reference '_' bin_id];
     case 'zootow'
-      sample_id = ['ZOOTOW_' sample_reference '_' bin_id];
+      sample_id = [global_metadata.meta.cruise_id '_ZOOTOW_' sample_reference '_' bin_id];
+     case 'karen'
+      sample_id = [global_metadata.meta.cruise_id '_EXP_' sample_reference '_' bin_id];
     otherwise
       fprintf(['Unknow sample_source ' bin_id ' in metadata.csv\n']);
       sample_id = bin_id;
