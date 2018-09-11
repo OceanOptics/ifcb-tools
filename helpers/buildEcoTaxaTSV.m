@@ -164,7 +164,7 @@ parfor (i_bin=1:size(bin_ids,1), parfor_arg)
   % No sampling time is set to bin_id as it's probably from inline
   if isempty(bin_metadata.dt{i_bm}); object_date = bin_id(2:9); object_time = bin_id(11:16);
   else; object_date = [bin_metadata.dt{i_bm}(1:4) bin_metadata.dt{i_bm}(6:7) bin_metadata.dt{i_bm}(9:10)];
-        object_time = [bin_metadata.dt{i_bm}(11:12) bin_metadata.dt{i_bm}(13:14) bin_metadata.dt{i_bm}(15:16)]; end
+        object_time = [bin_metadata.dt{i_bm}(12:13) bin_metadata.dt{i_bm}(15:16) bin_metadata.dt{i_bm}(18:19)]; end
   if ~isnan(bin_metadata.depth(i_bm))
     object_depth_min = num2str(bin_metadata.depth(i_bm));
     object_depth_max = num2str(bin_metadata.depth(i_bm));
