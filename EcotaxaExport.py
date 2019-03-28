@@ -13,6 +13,8 @@ from bs4 import BeautifulSoup
 from time import sleep
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+MAXQUEUESIZE = 5
+
 
 #TO-DO:
 # See if SSL verification is needed
@@ -61,6 +63,9 @@ def parsePrjName(html):
     html = str(html)
     html = html.split('>')[1]
     html = html.split('<')[0]
+    html = html.replace(' ', '_')
+    html = html.replace('(', '')
+    html = html.replace(')', '')
     return html
 
 def parseFileName(html):
@@ -128,20 +133,38 @@ def startTask(session, id):
     subtaskraw = soup.find_all('div', attrs={'class':'alert alert-success alert-dismissible'})
     return parseSubtask(subtaskraw)
 
+def newQueueElement(session, id):
+    # returns tuple of id, task
+    task = startTask(session, id)
+    print("Exporting project " + str(id) + " as task " + str(task))
+    return (id,task)
 
-def downloadProjs(session, explist, path=None):
-    done = False
+def downloadProjs(session, idlist, path=None):
     url = 'https://ecotaxa.obs-vlfr.fr/Task/listall'
+
+    # queue of tuples w/ structure (id, task)
+    activequeue = []
+
+    # setup queue
+    if len(idlist) > MAXQUEUESIZE:
+        for i in range(MAXQUEUESIZE):
+            activequeue.append(newQueueElement(session, idlist[i]))
+
+        del idlist[:MAXQUEUESIZE]
+    else:
+        for i in idlist:
+            activequeue.append(newQueueElement(session, i))
+        idlist = []
+
     dt = datetime.datetime.now()
     folder = "export_" + dt.strftime("%y%m%d_%H%M%S")
-
     os.mkdir(folder)
     os.chdir(folder)
     homedir = os.getcwd()
-    while not done:
+    while True:
         taskpage = session.get(url, verify=False)
         soup = BeautifulSoup(taskpage.content, 'html5lib')
-        for item in explist:
+        for item in activequeue:
             print('Pinging project '+str(item[0])+ '\'s status')
             rawstatus = soup.find_all('a', attrs={'href': ('/Task/Show/'+str(item[1]))})
             if "Done" in str(rawstatus[1]):
@@ -149,70 +172,58 @@ def downloadProjs(session, explist, path=None):
                 fetchFile(session, item)
                 print("Removing task from Ecotaxa server")
                 session.get('https://ecotaxa.obs-vlfr.fr/Task/Clean/'+str(item[1]))
-                explist.remove(item)
+                activequeue.remove(item)
                 os.chdir(homedir)
-        if len(explist) == 0:
+        if len(idlist) > 0 and len(activequeue) < MAXQUEUESIZE:
+            activequeue.append(newQueueElement(session, idlist.pop(0)))
+        if len(activequeue) == 0:
             return
         else:
             sleep(2)
 
-
-# Command line arguments
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    '-u', '--user',
-    required=True,
-    help='<required> email of Ecotaxa account'
-                    )
-parser.add_argument(
-    '-p', '--path',
-    required=False,
-    help='<optional> path of export'
-    )
-parser.add_argument(
-    '-e', '--export',
-    required=False,
-    nargs='+',
-    type=str,
-    help='<INCOMPLETE> export parameters, default is plain TSV'
-)
-parser.add_argument(
-    '-i', '--ids',
-    nargs='+',
-    type=int,
-    help="<required> ids of projects to be downloaded, separated by space(0 for all projects)"
-    )
+if __name__ == "__main__":
+    # Command line arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '-u', '--user',
+        required=True,
+        help='<required> email of Ecotaxa account'
+        )
+    parser.add_argument(
+        '-p', '--path',
+        required=False,
+        help='<optional> path of export'
+        )
+    parser.add_argument(
+        '-i', '--ids',
+        nargs='+',
+        type=int,
+        help="<required> ids of projects to be downloaded, separated by space(0 for all projects)"
+        )
 
 
-args = parser.parse_args()
-user = args.user
-ids = args.ids
-names = args.ids
-path = args.path
-options = args.export
+    args = parser.parse_args()
+    user = args.user
+    ids = args.ids
+    names = args.ids
+    path = args.path
 
-with requests.Session() as r:
-    loginUser(r, user)
-    if path is not None:
-        try:
-            os.chdir(path)
-        except FileNotFoundError:
-            print("Error: Provided directory doesn't exist")
-            sys.exit()
+    with requests.Session() as r:
+        loginUser(r, user)
+        if path is not None:
+            try:
+                os.chdir(path)
+            except FileNotFoundError:
+                print("Error: Provided directory doesn't exist")
+                sys.exit()
 
-    if len(ids) == 1 and ids[0] == 0:
-        ids = fetchIDs(r)
-    else:
-        ids = fetchIDs(r, ids)
+        if len(ids) == 1 and ids[0] == 0:
+            ids = fetchIDs(r)
+        else:
+            ids = fetchIDs(r, ids)
 
-    if ids is not None:
-        # 2D list with structure: [ [id1,task1], [id2,task2], etc]
-        exports = []
-        for i in ids:
-            task = startTask(r,i)
-            print("Exporting project " +str(i)+ " as task "+str(task))
-            exports.append([i, task])
-        downloadProjs(r, exports, path)
-        print("Process successfully completed, good-bye!\n")
-    else:
-        print("Error: No matching project")
+        if ids is not None:
+            downloadProjs(r, ids, path)
+            print("Process successfully completed, good-bye!\n")
+        else:
+            print("Error: No matching project")
