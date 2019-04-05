@@ -240,12 +240,12 @@ def readCSV(filename):
 
 #Jason's functions
 
-def makeTrans(mode):
+def makeTrans(mode, direct):
     # Make dictionary matching hierarchy to either prettified or grouped names
-    df = pd.read_excel("./taxonomic_grouping.xlsx")
-    if mode == 0:
+    df = pd.read_excel(direct)
+    if mode.lower() == 'species':
         translator = df.set_index('hierarchy')['category_prettified'].to_dict()
-    elif mode == 1:
+    elif mode.lower() == 'group':
         translator = df.set_index('hierarchy')['category_grouped'].to_dict()
     return translator
 
@@ -260,15 +260,18 @@ def changeCategory(translator, hierarchy):
     result = result.replace('.', '')
     return result
 
-def checkValidDirects(raw, ecotaxa, img):
+def checkValidDirects(raw, ecotaxa, out, tax):
     if not os.path.exists(raw):
         print("Error: Provided IFCB directory doesn't exist")
         sys.exit()
     if not os.path.exists(ecotaxa):
         print("Error: Provided ecotaxa tsv directory doesn't exist")
         sys.exit()
-    if not os.path.exists(img):
-        os.makedirs(img)
+    if not os.path.exists(out):
+        os.makedirs(out)
+    if not os.path.exists(tax):
+        print("Error: Taxonomic grouping directory doesn't exist")
+        sys.exit()
 
     return True
 
@@ -330,37 +333,46 @@ if __name__ == "__main__":
         help='<required> directory of IFCB folder containing raw photos'
     )
     parser.add_argument(
-        '-i', '--imgdirectory',
+        '-o', '--outputdirectory',
         required=False,
         help='<optional> directory of desired output, places PNGs into ./Dataset in cwd otherwise'
     )
     parser.add_argument(
         '-m', '--mode',
         required=False,
-        choices=['0', '1'],
-        help='<optional> 0 = prettified(default), 1 = grouped'
+        choices=['species', 'group'],
+        help='<optional> species = prettified(default), group = grouped'
+    )
+    parser.add_argument(
+        '-t', '--taxfile',
+        required=False,
+        help='<optional> directory of taxonomic translation spreadsheet'
     )
 
     args = parser.parse_args()
     ecotaxadirect = args.ecotaxadirectory
     ifcbdirect = args.rawdirectory
-    imgdirect = args.imgdirectory
-    if args.imgdirectory is not None:
-        imgdirect = args.imgdirectory
+    outputdirect = args.outputdirectory
+    if args.outputdirectory is not None:
+        outputdirect = args.outputdirectory
     else:
-        imgdirect = "./Dataset"
+        outputdirect = "./Dataset"
     if args.mode is not None:
-        mode = int(args.mode)
+        mode = args.mode
     else:
-        mode = 0
+        mode = 'species'
+    if args.taxfile is not None:
+        taxdirect = args.taxfile
+    else:
+        taxdirect = "./taxonomic_grouping.xlsx"
 
     #check provided directories exist & make img directory, save time if invalid
-    if checkValidDirects(ifcbdirect, ecotaxadirect, imgdirect):
-        translator = makeTrans(mode)
+    if checkValidDirects(ifcbdirect, ecotaxadirect, outputdirect, taxdirect):
+        translator = makeTrans(mode, taxdirect)
         print("Parsing TSV file(s)")
         data = parseEcoTaxaDir(ecotaxadirect)
         print('Number of images: ' + str(len(data['img_id'])))
-        extractDeepLearn(data, ifcbdirect, translator, imgdirect)
+        extractDeepLearn(data, ifcbdirect, translator, outputdirect)
 
 
 
