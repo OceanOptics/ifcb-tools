@@ -21,12 +21,15 @@ MAXQUEUESIZE = 5
 # Allow for export with names, path, and export parameters
 
 
-def loginUser(session, usr):
+def loginUser(session, usr, auth=None):
     url = "https://ecotaxa.obs-vlfr.fr/login"
     csrfpage = session.get(url, verify=False)
     soup = BeautifulSoup(csrfpage.content, 'html5lib')
     csrftoken = soup.find('input', attrs={'name': 'csrf_token'})['value']
-    pw = getpass.getpass(prompt='Enter password of ' +usr+"\n:", stream=None)
+    if auth is not None:
+        pw = auth
+    else:
+        pw = getpass.getpass(prompt='Enter password of ' +usr+"\n:", stream=None)
     print("Attemping log-in...")
     logincred = {'csrf_token': csrftoken,
                  'email': usr,
@@ -181,6 +184,7 @@ def downloadProjs(session, idlist, path=None):
         else:
             sleep(2)
 
+
 if __name__ == "__main__":
     # Command line arguments
     parser = argparse.ArgumentParser()
@@ -200,6 +204,11 @@ if __name__ == "__main__":
         type=int,
         help="<required> ids of projects to be downloaded, separated by space(0 for all projects)"
         )
+    parser.add_argument(
+        '-a', '--authorization',
+        required =False,
+        help='<optional> provide password for Ecotaxa via command-line rather than script'
+    )
 
 
     args = parser.parse_args()
@@ -207,9 +216,11 @@ if __name__ == "__main__":
     ids = args.ids
     names = args.ids
     path = args.path
+    auth = args.authorization
+
 
     with requests.Session() as r:
-        loginUser(r, user)
+        loginUser(r, user, auth)
         if path is not None:
             try:
                 os.chdir(path)
