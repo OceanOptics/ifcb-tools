@@ -160,7 +160,7 @@ def downloadProjs(session, idlist, path=None):
         idlist = []
 
     dt = datetime.datetime.now()
-    folder = "export_" + dt.strftime("%y%m%d_%H%M%S")
+    folder = "EcoTaxa_" + dt.strftime("%Y%m%d_%H%M%S")
     os.mkdir(folder)
     os.chdir(folder)
     homedir = os.getcwd()
