@@ -25,10 +25,10 @@ def modConfig(section, key, value):
 def updateExportDate():
     print("Updating date_export...")
     dt = datetime.datetime.now()
-    modConfig('Ecotaxa', 'date_export', dt.strftime("%Y%m%d"))
+    modConfig('EcoTaxa', 'date_export', dt.strftime("%Y%m%d"))
 
 
-# formats projects from cfg for EcotaxaExport
+# formats projects from cfg for EcoTaxaExport
 def projParse():
     rawprojects = loadConfig('EcoTaxa', 'projects_to_exports')
     spaceless = rawprojects.replace(' ', '')
