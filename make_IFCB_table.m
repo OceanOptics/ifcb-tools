@@ -3,18 +3,30 @@
 %   + calibrated features (pixel to um)
 %   + reliable samples (flag and trigger selection)
 
-cfg.path2data = '/Users/nils/Data/NAAMES/';
+addpath helpers/
+
+%% Load configuration file
+%     default: BuildScientificDataSet.cfg
+% CFG_FILENAME = '~/Documents/PycharmProjects/EcotaxaScripts/BuildScientificDataSet.cfg';
+cfg = loadCfg(CFG_FILENAME);
+cfg.Matlab.EcoTaxa = cfg.EcoTaxa;
+cfg = cfg.Matlab;
+cfg.EcoTaxa.date_export = num2str(cfg.EcoTaxa.date_export);
+
+MAKE_IFCB_TABLE_VERSION = 'v11';
 
 %% Load IFCB data
 fprintf('Loading IFCB tables ... ');
-in1 = load([cfg.path2data 'NAAMES1/IFCB/other/meta_hdr_ftr_adc.mat']); in1 = in1.ifcb;
-in2 = load([cfg.path2data 'NAAMES2/IFCB/other/meta_hdr_ftr_adc.mat']); in2 = in2.ifcb;
-in3 = load([cfg.path2data 'NAAMES3/IFCB/other/meta_hdr_ftr_adc.mat']); in3 = in3.ifcb;
-in4 = load([cfg.path2data 'NAAMES4/IFCB/other/meta_hdr_ftr_adc.mat']); in4 = in4.ifcb;
+cfg_filednames = fieldnames(cfg);
+ifcb = []; campaign_ids = [];
+for i = find(cellfun(@(x) ~isempty(x), strfind(cfg_filednames, 'path_to_metadata')))'
+  foo = load(cfg.(cfg_filednames{i}), 'ifcb');
+  foo.ifcb.campaign_id(:) = str2double(cfg_filednames{i}(end)); % Number of field
+  ifcb = [ifcb; foo.ifcb];
+end
 fprintf('Done\n');
+
 fprintf('Reformating IFCB tables ... ');
-ifcb = [in1; in2; in3; in4];
-ifcb.campaign_id = [ones(size(in1,1),1) * 1; ones(size(in2,1),1) * 2; ones(size(in3,1),1) * 3; ones(size(in4,1),1) * 4];
 ifcb = movevars(ifcb,'campaign_id','Before','stn_id');
 ifcb.type = categorical(ifcb.type);
 fprintf('Done\n');
@@ -36,14 +48,12 @@ fprintf('Done\n');
 % end
 
 %% Load EcoTaxa data
-% Meant to be used with Jason's export utility
-date_export = '190420';
-data_version = '10'; % used for saving file only
 % Get name of all dirs
-ifcb_ecotaxa_output_dir = [cfg.path2data 'NAAMES*/IFCB/ecotaxa_output/*_' date_export '_*/*/*.tsv'];
+ifcb_ecotaxa_output_dir = [cfg.EcoTaxa.path_to_ecotaxa_data filesep 'EcoTaxa_' cfg.EcoTaxa.date_export '_*' filesep '*' filesep '*.tsv'];
 
 d = table({},{},{},[], 'VariableNames', {'object_id', 'object_annotation_hierarchy', 'object_annotation_status', 'object_annotation_dt'});
 l=dir(ifcb_ecotaxa_output_dir);
+if isempty(l); fprintf(['WARNING: No files found in EcoTaxa_' cfg.EcoTaxa.date_export '\n']); return; end
 for j=1:length(l)
   fprintf('Reading %s ... ', l(j).name);
   buffer = readtable([l(j).folder '/' l(j).name],'FileType','text', 'Delimiter', '\t');
@@ -59,6 +69,7 @@ for j=1:length(l)
 end
 
 %% Plot Cumulative Distribution function
+fprintf('Plotting cumulative validated images ...'); 
 % Compute cumulative counts
 dt = datenum(2017,01,01):today();
 cc = zeros(size(dt));
@@ -72,8 +83,8 @@ for i=2:length(dt)
   list = list(~sel);
 end
 
-%% Plot
-fig(1); hold('on');
+% Plot
+figure(1); hold('on');
 area(dt,cc, 'FaceAlpha', 0.5, 'FaceColor', lines(1), 'EdgeColor', lines(1));
 xlim([dt(1) dt(end)]);
 plot(xlim(), 10^5 * ones(2,1), 'k--');
@@ -81,10 +92,15 @@ plot(xlim(), 10^6 * ones(2,1), 'k--');
 plot(xlim(), 2 * 10^6 * ones(2,1), 'k--');
 ylabel('Ecotaxa Annotations (#)');
 text(today(), cc(end), sprintf('%1.3f\\times10^{6}', cc(end)/10^6), 'HorizontalAlignment', 'right', 'VerticalAlignment', 'bottom', 'FontSize', 16);
-datetick2_doy(); set(datacursormode(figure(1)),'UpdateFcn',@data_cursor_display_date);
-title(['IFCB v' data_version ' - ' datestr(datenum('190420', 'yymmdd'), 'mmmm dd, yyyy')]);
+datetick();
+title(['IFCB ' MAKE_IFCB_TABLE_VERSION ' - ' datestr(datenum(cfg.EcoTaxa.date_export, 'yyyymmdd'), 'mmmm dd, yyyy')]);
 set(gca,'FontSize', 16, 'FontName', 'Helvetica Neue');
-save_fig([cfg.path2data 'paperBB/figures/ecotaxa_images_validated'], 1024, 720);
+w=800; h=600;
+set(gcf,'WindowStyle','Normal'); drawnow();
+set(gcf, 'Position',[0 0 w h]); drawnow();
+datetick();
+saveas(gcf, [cfg.EcoTaxa.path_to_ecotaxa_data filesep 'EcoTaxa_' cfg.EcoTaxa.date_export], 'svg');
+fprintf('Done\n');
 
 %% Merge IFCB metadata with EcoTaxa classification
 % remove non standard object_id
@@ -99,7 +115,7 @@ end
 
 % convert annotation hierarchy to simple names
 fprintf('Renaming species and grouping species ... ');
-pretty_taxo = readtable([cfg.path2data  'paperBB/user_input/taxonomic_grouping_v2.xlsx']);
+pretty_taxo = readtable(cfg.path_to_taxonomic_grouping);
 % add each sample to raw file
 for i=1:height(pretty_taxo)
   sel = strcmp(d.object_annotation_hierarchy, pretty_taxo.hierarchy{i});
@@ -366,11 +382,16 @@ fprintf('Done\n');
 %     + Bug fix: incorrect units (stayed in pixels instead of being um after conversion)
 %                does not affect values but just metadata
 %     + Removed samples with negative volumes
-fprintf('Saving ... ');
-% save([cfg.path2data 'paperBB/data/ifcb_v' data_version], 'ifcb');%, '-v7.3');
+% v11: April 25, 2019
+%     + Automated pipeline from exporting all projects of EcoTaxa to making IFCB table
+%     + No changes expected to the IFCB table
+fprintf('Saving MATLAB table... ');
+save([cfg.path_to_matlab_table_out filesep 'ifcb_' MAKE_IFCB_TABLE_VERSION '_' cfg.EcoTaxa.date_export], 'ifcb');%, '-v7.3');
 fprintf('Done\n');
 
 %% Quick extraction to update online files
+fprintf('Saving Synthetic table... ');
 ifcb2 = ifcb(:,[1, 6, 9, 10, 11, 12, 40]);
 ifcb2.n = cellfun(@length, ifcb.ROIid);
-% writetable(ifcb2, [cfg.path2data 'paperBB/data/IFCB_NAAAMES_Samples_v' data_version '.csv']);
+writetable(ifcb2, [cfg.path_to_matlab_table_out filesep 'IFCB_NAAAMES_Samples_' MAKE_IFCB_TABLE_VERSION '_' cfg.EcoTaxa.date_export '.csv']);
+fprintf('Done\n');
