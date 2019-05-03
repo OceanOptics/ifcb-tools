@@ -20,6 +20,7 @@ import plotly.graph_objs as go
 
 
 CNN_MIN_IMAGES = 1000
+SUB_MAX_IMAGES = 10000
 DEFAULT_ECOTAXA_FIELDNAME = {'img_id': 'object_id',
                              'person': 'object_annotation_person_name',
                              'category': 'object_annotation_category',
@@ -72,11 +73,13 @@ def parseEcoTaxaDir(dirname, recursive=True, ecotaxa_fieldname=DEFAULT_ECOTAXA_F
 
     return data
 
+
 # Parse input with Panda (lot of text so slower)
 # DEPRECATED as slower
 def parseEcoTaxaFileWithPandas(filename):
     data = pd.read_csv(filename, sep='\t', header=0, skip_blank_lines=True)
     return data[['object_id', 'object_annotation_status', 'object_annotation_person_name', 'object_annotation_category', 'object_annotation_hierarchy']]
+
 
 def parseEcoTaxaDirWithPandas(dirname, recusive=True):
     data= pd.DataFrame()
@@ -225,6 +228,7 @@ def writeCSV(filename, data, keys=None):
         writer.writerow(keys)
         writer.writerows(zip(*[data[key] for key in keys]))
 
+
 def readCSV(filename):
     with open(filename, 'r') as fid:
         fid = csv.reader(fid, delimiter=',')
@@ -260,6 +264,7 @@ def changeCategory(translator, hierarchy):
     result = result.replace('.', '')
     return result
 
+
 def checkValidDirects(raw, ecotaxa, out, tax):
     if not os.path.exists(raw):
         print("Error: Provided IFCB directory doesn't exist")
@@ -268,22 +273,51 @@ def checkValidDirects(raw, ecotaxa, out, tax):
         print("Error: Provided ecotaxa tsv directory doesn't exist")
         sys.exit()
     if not os.path.exists(out):
-        os.makedirs(out)
+        if not os.path.exists(os.path.join(out, "00001")):
+            os.makedirs(os.path.join(out, "00001"))
     if not os.path.exists(tax):
         print("Error: Taxonomic grouping directory doesn't exist")
         sys.exit()
 
     return True
 
+
+# returns the str name of folder number in subdirectory
+def getSubName(num):
+    digits = len(str(num))
+    return (('0'*(5-digits)) + str(num))
+
+
+# identifies previous image extractions and resumes adding to last subdirectory
+def resumeFromDirect(path_png):
+    filecount = len([f for f in os.listdir(path_png) if os.path.isdir(os.path.join(path_png, f))])
+    # print("Folders in direct: "+ str(filecount))
+    if filecount > 0:
+        # Find greatest # folder
+        max = 1;
+        for x in os.listdir(path_png):
+            if os.path.isdir(os.path.join(path_png, x)):
+                if(int(x) > max):
+                    max = int(x)
+
+        # Find number of photos
+        # print("Largest Folder Name: " + str(max))
+        filecount = len([f for f in os.listdir(os.path.join(path_png,getSubName(max))) if f.endswith(".png")])
+        # print("Last folder: "+ str(max)+ ", containing "+ str(filecount)+" images")
+        return max, filecount
+    else:
+        return 1, 1
+
+
 def extractDeepLearn(data, path_raw, translator, path_png):
     # Get each image by bin
     bin = [i[0:24] for i in data['img_id']]
     ubin = set(bin)
     fauind = 1
+    activesub, imagenum = resumeFromDirect(path_png)
 
     #Needed, ensures path ends in trailing slash
     path_raw = os.path.join(path_raw, '')
-
     # Extract images
     for b in ubin:
         sys.stdout.write(F"\rExtracting bin {fauind} of {str(len(ubin))}")
@@ -304,15 +338,20 @@ def extractDeepLearn(data, path_raw, translator, path_png):
                 roi_ids.append(int(i[-5:]))
                 roi_hier.append(h)
                 roi_stat.append(s)
-        # roi_ids = [int(i[-5:]) for i, j in zip(data['img_id'], bin) if j == b]
+
         # Extract images
         for i, h, s in zip(np.array(roi_ids) - 1, roi_hier, roi_stat):
             if s == 'validated':
                 if start_byte[i] != end_byte[i]:
+                    imagenum+= 1
+                    if imagenum > SUB_MAX_IMAGES:
+                        imagenum = 1
+                        activesub += 1
+                        os.mkdir(os.path.join(path_png,getSubName(activesub)))
                     img = roi[start_byte[i]:end_byte[i]].reshape(height[i], width[i])
                     category = changeCategory(translator, h)
                     bsplit = b.split('_')
-                    imageio.imwrite(os.path.join(path_png, '%s%sP%05d_%s.png' % (bsplit[1], bsplit[0], i + 1, category)), img)
+                    imageio.imwrite(os.path.join(path_png, getSubName(activesub), '%s%sP%05d_%s.png' % (bsplit[1], bsplit[0], i + 1, category)), img)
                 else:
                     raise ValueError('Empty image was classified.')
     # Makes terminal cleaner
@@ -373,9 +412,3 @@ if __name__ == "__main__":
         data = parseEcoTaxaDir(ecotaxadirect)
         print('Number of images: ' + str(len(data['img_id'])))
         extractDeepLearn(data, ifcbdirect, translator, outputdirect)
-
-
-
-
-
-
