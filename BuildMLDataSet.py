@@ -247,6 +247,7 @@ def readCSV(filename):
 def makeTrans(mode, direct):
     # Make dictionary matching hierarchy to either prettified or grouped names
     df = pd.read_excel(direct)
+    df['hierarchy'] = df['hierarchy'].replace(np.nan, 'unclassified', regex=True)
     if mode.lower() == 'species':
         translator = df.set_index('hierarchy')['category_prettified'].to_dict()
     elif mode.lower() == 'group':
@@ -256,7 +257,10 @@ def makeTrans(mode, direct):
 
 def changeCategory(translator, hierarchy):
     try:
-        result = translator[hierarchy]
+        if hierarchy:
+            result = translator[hierarchy]
+        else:
+            result = translator['unclassified']
     except KeyError:
         print("Error: hierarchy %s not found" % hierarchy)
         sys.exit()
@@ -273,8 +277,8 @@ def checkValidDirects(raw, ecotaxa, out, tax):
         print("Error: Provided ecotaxa tsv directory doesn't exist")
         sys.exit()
     if not os.path.exists(out):
-        if not os.path.exists(os.path.join(out, "00001")):
-            os.makedirs(os.path.join(out, "00001"))
+        print("Error: Provided output directory doesn't exist")
+        sys.exit()
     if not os.path.exists(tax):
         print("Error: Taxonomic grouping directory doesn't exist")
         sys.exit()
@@ -289,7 +293,7 @@ def getSubName(num):
 
 
 # identifies previous image extractions and resumes adding to last subdirectory
-def resumeFromDirect(path_png):
+def resumeFromDir(path_png):
     filecount = len([f for f in os.listdir(path_png) if os.path.isdir(os.path.join(path_png, f))])
     # print("Folders in direct: "+ str(filecount))
     if filecount > 0:
@@ -314,7 +318,11 @@ def extractDeepLearn(data, path_raw, translator, path_png):
     bin = [i[0:24] for i in data['img_id']]
     ubin = set(bin)
     fauind = 1
-    activesub, imagenum = resumeFromDirect(path_png)
+
+    # Init sub-directories
+    activesub, imagenum = resumeFromDir(path_png)
+    if activesub == 1:
+        os.makedirs(os.path.join(path_png, getSubName(activesub)))
 
     #Needed, ensures path ends in trailing slash
     path_raw = os.path.join(path_raw, '')
@@ -341,19 +349,19 @@ def extractDeepLearn(data, path_raw, translator, path_png):
 
         # Extract images
         for i, h, s in zip(np.array(roi_ids) - 1, roi_hier, roi_stat):
-            if s == 'validated':
-                if start_byte[i] != end_byte[i]:
-                    imagenum+= 1
-                    if imagenum > SUB_MAX_IMAGES:
-                        imagenum = 1
-                        activesub += 1
-                        os.mkdir(os.path.join(path_png,getSubName(activesub)))
-                    img = roi[start_byte[i]:end_byte[i]].reshape(height[i], width[i])
-                    category = changeCategory(translator, h)
-                    bsplit = b.split('_')
-                    imageio.imwrite(os.path.join(path_png, getSubName(activesub), '%s%sP%05d_%s.png' % (bsplit[1], bsplit[0], i + 1, category)), img)
-                else:
-                    raise ValueError('Empty image was classified.')
+            if start_byte[i] != end_byte[i]:
+                imagenum+= 1
+                if imagenum > SUB_MAX_IMAGES:
+                    imagenum = 1
+                    activesub += 1
+                    os.mkdir(os.path.join(path_png,getSubName(activesub)))
+                img = roi[start_byte[i]:end_byte[i]].reshape(height[i], width[i])
+                category = changeCategory(translator, h)
+                # Make image filename
+                bsplit = b.split('_')
+                imageio.imwrite(os.path.join(path_png, getSubName(activesub), '%s%sP%05d_%s.png' % (bsplit[1], bsplit[0], i + 1, category)), img)
+            else:
+                raise ValueError('Empty image was classified.')
     # Makes terminal cleaner
     print("")
 
@@ -374,41 +382,42 @@ if __name__ == "__main__":
     parser.add_argument(
         '-o', '--outputdirectory',
         required=False,
-        help='<optional> directory of desired output, places PNGs into ./Dataset in cwd otherwise'
+        help='<optional> directory of desired output, places PNGs into ./Dataset in cwd otherwise',
+        default='dataset'
     )
     parser.add_argument(
         '-m', '--mode',
         required=False,
         choices=['species', 'group'],
-        help='<optional> species = prettified(default), group = grouped'
+        help='<optional> species = prettified(default), group = grouped',
+        default='species'
     )
     parser.add_argument(
         '-t', '--taxfile',
         required=False,
-        help='<optional> directory of taxonomic translation spreadsheet'
+        help='<optional> directory of taxonomic translation spreadsheet',
+        default='taxonomic_grouping.xlsx'
+    )
+    parser.add_argument(
+        '-s', '--img_status',
+        required=False,
+        help='<optional> status of image to export (validated by default)',
+        default='validated'
     )
 
     args = parser.parse_args()
-    ecotaxadirect = args.ecotaxadirectory
-    ifcbdirect = args.rawdirectory
-    outputdirect = args.outputdirectory
-    if args.outputdirectory is not None:
-        outputdirect = args.outputdirectory
-    else:
-        outputdirect = "./Dataset"
-    if args.mode is not None:
-        mode = args.mode
-    else:
-        mode = 'species'
-    if args.taxfile is not None:
-        taxdirect = args.taxfile
-    else:
-        taxdirect = "./taxonomic_grouping.xlsx"
 
     #check provided directories exist & make img directory, save time if invalid
-    if checkValidDirects(ifcbdirect, ecotaxadirect, outputdirect, taxdirect):
-        translator = makeTrans(mode, taxdirect)
+    if checkValidDirects(args.rawdirectory, args.ecotaxadirectory, args.outputdirectory, args.taxfile):
+        translator = makeTrans(args.mode, args.taxfile)
         print("Parsing TSV file(s)")
-        data = parseEcoTaxaDir(ecotaxadirect)
+        data = parseEcoTaxaDir(args.ecotaxadirectory, status=args.img_status)
+
+        # Remove annotations from data with predicted status
+        if args.img_status in ['predicted', 'dubious', 'unclassified']:
+            for i in range(len(data['hierarchy'])):
+                data['category'][i] = 'unclassified'
+                data['hierarchy'][i] = 'unclassified'
+
         print('Number of images: ' + str(len(data['img_id'])))
-        extractDeepLearn(data, ifcbdirect, translator, outputdirect)
+        extractDeepLearn(data, args.rawdirectory, translator, args.outputdirectory)
