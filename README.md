@@ -48,3 +48,8 @@ Converts exported tsv from local metadata into images titled by project ids
     - default: 'species'
 * -t / --taxfile (optional) directory of taxonomic translation spreadsheet
     - default: cwd
+    
+```
+example:
+python3 BuildMLDataSet.py -e /Ecotaxa/TSV/Directory -r /IFCB/Binary/Data/ -o /Image/Output/Directory -m group -t /Taxonomy/Excel/File
+```
