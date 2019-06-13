@@ -1,6 +1,15 @@
 # EcotaxaScripts
 Scripts for the export, import, and management of project data from Ecotaxa Servers
 
+**Non-Native Packages:**
+
+* argparse - used to add easy-to-read command arguments to scripts
+* beautifulsoup4 - used for parsing html files for EcotaxaExport
+* imageio - used in generating images for BuildMLDataSet
+* requests - used for web-scraping with EcotaxaExport
+* numpy - used for graphing in BuildMLDataSet
+* pandas - used for easy reading of excel & csv files in BuildMLDataSet
+
 # EcotaxaExport
 **Summary:**
 Using provided user information, connects to Ecotaxa server and pulls specific projects 
