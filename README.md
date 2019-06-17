@@ -62,3 +62,7 @@ Converts exported tsv from local metadata into images titled by project ids
 example:
 python3 BuildMLDataSet.py -e /Ecotaxa/TSV/Directory -r /IFCB/Binary/Data/ -o /Image/Output/Directory -m group -t /Taxonomy/Excel/File
 ```
+
+# BuildPublicDataSet
+**IN PROGRESS:**
+Built off BuildMLDataSet, used to make datasets for public databases (i.e. Kaggle)
