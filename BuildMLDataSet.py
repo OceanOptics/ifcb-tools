@@ -7,10 +7,12 @@
 #       + folders with formated png (resized) for each category (not available yet)
 #       + binary file optimized for TensorFlow input            (not available yet)
 
-import csv
-import os, errno, argparse, sys, imageio
+import os, errno, argparse, sys, imageio, random, csv
 import numpy as np
 from scipy import misc
+from functools import lru_cache
+from bisect import bisect_left
+from multiprocessing import Pool
 
 # Packages for development
 import time
@@ -18,7 +20,8 @@ import pandas as pd
 import plotly.offline as py
 import plotly.graph_objs as go
 
-
+B62LIST = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+THRESHOLD = 10
 CNN_MIN_IMAGES = 1000
 SUB_MAX_IMAGES = 10000
 DEFAULT_ECOTAXA_FIELDNAME = {'img_id': 'object_id',
@@ -269,7 +272,7 @@ def changeCategory(translator, hierarchy):
     return result
 
 
-def checkValidDirects(raw, ecotaxa, out, tax):
+def checkValidDirects(raw, ecotaxa, out, tax, meta):
     if not os.path.exists(raw):
         print("Error: Provided IFCB directory doesn't exist")
         sys.exit()
@@ -277,10 +280,14 @@ def checkValidDirects(raw, ecotaxa, out, tax):
         print("Error: Provided ecotaxa tsv directory doesn't exist")
         sys.exit()
     if not os.path.exists(out):
-        print("Error: Provided output directory doesn't exist")
-        sys.exit()
+        print("Provided output directory doesn't exist, creating...", end='')
+        os.makedirs(out)
+        print('Done!')
     if not os.path.exists(tax):
         print("Error: Taxonomic grouping directory doesn't exist")
+        sys.exit()
+    if not os.path.exists(meta):
+        print("Error: Metadata directory does not exist")
         sys.exit()
 
     return True
@@ -366,6 +373,458 @@ def extractDeepLearn(data, path_raw, translator, path_png):
     print("")
 
 
+# Kaggle Functions
+def num2base62(num):
+    """Converts int to custom base62 string"""
+    base62 = ''
+    while num != 0:
+        num, i = divmod(num, len(B62LIST))
+        base62 = B62LIST[i] + base62
+
+    return base62
+
+
+def base62decode(b62):
+    """Returns custom base62 string to int"""
+    num = 0
+    for i in range(len(b62)):
+        num = (num * len(B62LIST)) + B62LIST.index(b62[i])
+    return num
+
+
+def getSubLists(startlist, subcount):
+    """Breaks a given list of categories into 2 lists based on subcount"""
+    testlist = random.sample(startlist, subcount)
+    for i in testlist:
+        startlist.remove(i)
+
+    return startlist, testlist
+
+
+def getSubsetSize(data, bad_list=None, limit=10, testfrac=0.05):
+    """Returns a dictionary of lists with structure:
+    dict['valid'] - valid classes being used in dataset
+    dict['learnsize'] - # of images being added to learnset
+    dict['testsize'] - # of images being added to testset
+    dict['short'] - classes being excluded due to count < limit or user request"""
+    sizedata = {}
+    short = []
+    learn = []
+    test = []
+    categories = sorted(set(data['category']))
+    if bad_list is not None:
+        for i in bad_list:
+            if i in categories:
+                short.append(i)
+                categories.remove(i)
+            else:
+                print("Error: Invalid category '"+i+"' in exclusion list")
+    counts = [data['category'].count(c) for c in categories]
+
+    # Add file to short if < limit
+    for i in range(len(categories)):
+        if counts[i] < limit:
+            short.append(categories[i])
+        # Otherwise split count into subset by fraction
+        else:
+            tvalue = int(round(testfrac * counts[i]))
+            if tvalue == 0:
+                tvalue = 1
+            lvalue = counts[i] - tvalue
+            test.append(tvalue)
+            learn.append(lvalue)
+
+    # Add to dictionary and return
+    valid = [c for c in categories if c not in short]
+    sizedata['valid'] = valid
+    sizedata['learnsize'] = learn
+    sizedata['testsize'] = test
+    sizedata['short'] = short
+    # print(short)
+    return sizedata
+
+
+def sortIndicesByCategory(data, subdata):
+    """Returns dictionary with valid classes as keys and lists of indices of data belonging
+    to said class"""
+    indexDict = {}
+    for i in subdata['valid']:
+        indexDict[i] = []
+
+    for i in range(len(data['img_id'])):
+        if (i + 1) % 1000 == 0:
+            sys.stdout.write(F"\r {str(i+1)}  indexes categorized")
+            sys.stdout.flush()
+            # print(str(i + 1) + " indexes categorized")
+        if data['category'][i] not in subdata['short']:
+            indexDict[data['category'][i]].append(i)
+    print('')
+    return indexDict
+
+
+def translate(data, taxfiledirect, mode='species'):
+    """Converts all categories according to taxo-spreadsheet + mode"""
+    t = makeTrans(mode, taxfiledirect)
+    for i in range(len(data['category'])):
+        data['category'][i] = changeCategory(t, data['hierarchy'][i])
+    return data
+
+
+def generateMasterCSV(data, output_path, bad_list):
+    """Create masterCSV for building dataset"""
+    # Begin labeling data
+    print("Generating new master CSV...")
+    count = 250000
+    data['img_num'] = []
+    data['img_name'] = []
+    data['subset'] = []
+    for i in range(len(data['img_id'])):
+        data['img_num'].append(count)
+        data['img_name'].append(num2base62(count))
+        # default label is excluded, all used data will be rewritten
+        data['subset'].append('exclude')
+        count += 1
+
+    # Establish valid categories and number of images for testing subset
+    print("Generating subset size...", end=" ")
+    subdata = getSubsetSize(data, bad_list)
+    print("Done!\nLabeling subset indices...")
+    indicesdata = sortIndicesByCategory(data, subdata)
+
+    # Split index lists into learning and testing sets, then label
+    for i in indicesdata:
+        print("Splitting and labeling class: "+ i + "...", end=' ')
+        learn, test = getSubLists(indicesdata[i], subdata['testsize'][subdata['valid'].index(i)])
+        for j in learn:
+            data['subset'][j] = 'learn'
+        for j in test:
+            data['subset'][j] = 'test'
+        print('Done!')
+    print("Classes labeled, removing excess data & writing to CSV...", end=" ")
+    # Strip Unnecessary Data and create mastercsv
+    data.pop('person')
+    data.pop('hierarchy')
+    data.pop('status')
+    writeCSV(os.path.join(output_path, 'master.csv'), data)
+    print("Done!")
+    return data
+
+
+def splitMasterData(mdata):
+    """ Splits master csv data and returns as test + learn subsets,
+    ignoring subsets labeled as blank (short)"""
+    # Create empty dictionaries with keys
+    print("Splitting master data into subsets...", end = ' ')
+    learndata = {}
+    testdata = {}
+    for i in mdata.keys():
+        learndata[i] = []
+        testdata[i] = []
+
+    for i in range(len(mdata['subset'])):
+        if mdata['subset'][i] == 'learn':
+            for x in mdata:
+                learndata[x].append(mdata[x][i])
+        elif mdata['subset'][i] == 'test':
+            for x in mdata:
+                testdata[x].append(mdata[x][i])
+        elif mdata['subset'][i] == 'exclude':
+            pass
+        else:
+            print("Invalid subset read(valid= 'learn', 'test', or 'exclude')")
+            print(mdata['subset'][i])
+            sys.exit()
+    print("Done!")
+    return testdata, learndata
+
+
+@lru_cache(maxsize=1)
+def cachedRead(file):
+    """Stores the last read to save time for multiple reads from the same file"""
+    return readCSV(file)
+
+
+def extractdate(id):
+    """Pulls date in form YYYMMDD from id"""
+    date = id[1:9]
+    return int(date)
+
+
+def makeSubsetCSV(subsetdata, metadirect, output_direct, file_name):
+    """Adds metadata & strips IFCB nomenclature in preparation for distribution"""
+    removefields = ['ESDV', 'PA', 'lat', 'long', 'img_num', 'subset', 'ConvexArea', 'ConvexPerimeter',
+                    'Perimeter']
+    fivedecfields = ['SSCIntegrated', 'SSCPeak', 'FLIntegrated', 'FLPeak']
+    twodecfields = ['ESD', 'Biovolume', 'FeretDiameter', 'MajorAxisLength', 'MinorAxisLength']
+
+    max = len(subsetdata['img_id'])
+    count = 1
+    for i in subsetdata['img_id']:
+        if count % 10000 == 0:
+            sys.stdout.write(F"\r Adding metadata {str(count)} of {max}")
+            sys.stdout.flush()
+        count += 1
+        csvname = i[:-6] +'.csv'
+        roi_id = str(int(i[-5:]))
+        try:
+            filedata = cachedRead(os.path.join(metadirect,csvname))
+            index = filedata['ROIid'].index(roi_id)
+        except FileNotFoundError:
+            print(csvname)
+            sys.exit()
+        try:
+            for key in filedata:
+                if key != 'id' and key != 'ROIid':
+                    subsetdata[key].append(filedata[key][index])
+        except KeyError:
+            for key in filedata:
+                if key != 'id' and key != 'ROIid':
+                    subsetdata[key] = []
+                    subsetdata[key].append(filedata[key][index])
+
+    # Clean up keys
+    for x in removefields:
+        subsetdata.pop(x)
+    subsetdata['ImgName'] = subsetdata.pop('img_name')
+    subsetdata['Category'] = subsetdata.pop('category')
+    subsetdata['Date'] = subsetdata.pop('img_id')
+    subsetdata['ESD'] = subsetdata.pop('ESDA')
+    k = list(subsetdata.keys())
+    for i in range(len(k)-4):
+        subsetdata[k[0]] = subsetdata.pop(k[0])
+        k = k[1:] + [k[0]]
+
+    # Shorten specified categories into 2 & 5 decimal places, format date
+    for i in range(len(subsetdata['ImgName'])):
+        for j in fivedecfields:
+            if subsetdata[j][i] != 'NaN':
+                subsetdata[j][i] = '{0:.5f}'.format(float(subsetdata[j][i]))
+        for j in twodecfields:
+            if subsetdata[j][i] != 'NaN':
+                subsetdata[j][i] = '{0:.2f}'.format(float(subsetdata[j][i]))
+        subsetdata['Date'][i] = extractdate(subsetdata['Date'][i])
+
+    print("\nMetadata linked, generating file...", end=' ')
+    writeCSV(os.path.join(output_direct,file_name), subsetdata)
+    print('Done!')
+
+
+def getSortedDirect(subset, category, path_png, indexdict):
+    """Taking a single element from imgdict generated in generateImages,
+    this function returns the appropriate directory for that image"""
+    directory = ''
+
+    # Determine directory for image
+    if subset == 'learn':
+        directory = 'Learning'
+    elif subset == 'test':
+        directory = 'Testing'
+    else:
+        directory = 'Excluded'
+    directory = directory + '/' + category + '/'
+
+    # Determine subdirectory for image
+    if directory in indexdict:
+        key = directory
+        directory = os.path.join(directory, getSubName(indexdict[key][0]))
+        indexdict[key][1] += 1
+        if indexdict[key][1] > SUB_MAX_IMAGES:
+            indexdict[key][1] = 1
+            indexdict[key][0] += 1
+    else:
+        indexdict[directory] = [1,1]
+        key = directory
+        directory = os.path.join(directory, getSubName(indexdict[directory][0]))
+        indexdict[key][1] += 1
+
+    # Merge with local directory for output location
+    directory = os.path.join(path_png, directory)
+
+    # If either sub or active directory d/n exist, make it
+    if not os.path.isdir(directory):
+        os.makedirs(directory)
+
+    return directory, indexdict
+
+
+def generateImages(masterdata, path_raw, path_png):
+    """Create Images and move to appropriate directory"""
+    # Make dictionary for naming images of format imgdict[img_id] = (img_name, subset)
+    print("Creating naming dictionary...", end=' ')
+    imgdict = {}
+    for i in range(len(masterdata['img_id'])):
+        imgdict[masterdata['img_id'][i]] = (
+        masterdata['img_name'][i], masterdata['category'][i], masterdata['subset'][i])
+        indexdict = {}
+    print("Done!")
+
+    # Get each image by bin
+    bin = [i[0:24] for i in masterdata['img_id']]
+    ubin = set(bin)
+    fauind = 1
+
+    # Needed, ensures path ends in trailing slash
+    path_raw = os.path.join(path_raw, '')
+
+    # Extract images
+    for b in ubin:
+        sys.stdout.write(F"\rExtracting bin {fauind} of {str(len(ubin))}")
+        sys.stdout.flush()
+        fauind += 1
+        # Load ADC File
+        # ADCFileFormat: trigger#, ADC_time, PMTA, PMTB, PMTC, PMTD, peakA, peakB, peakC, peakD, time of flight, grabtimestart, grabtimeend, ROIx, ROIy, ROIwidth, ROIheight,start_byte, comparator_out, STartPoint, SignalLength, status, runTime, inhibitTime
+        adc = np.loadtxt(path_raw + b + '.adc', delimiter=',')
+        width, height, start_byte = adc[:, 15].astype(int), adc[:, 16].astype(int), adc[:, 17].astype(int)
+        end_byte = start_byte + width * height
+        # end_byte = [start_byte[1:]].append(start_byte[-1] + width[-1] * height[-1])
+        # Open ROI File
+        roi = np.fromfile(path_raw + b + '.roi', 'uint8')
+        # Get index of image, category, and status to extract
+        ids = list()
+        for i, j in zip(masterdata['img_id'], bin):
+            if j == b:
+                ids.append(int(i[-5:]))
+
+        # Extract images
+        for i in np.array(ids) - 1:
+            if start_byte[i] != end_byte[i]:
+                img = roi[start_byte[i]:end_byte[i]].reshape(height[i], width[i])
+                # Make image filename
+                name = '%s_%05d' % (b, i + 1)
+                sorteddirect, indexdict = getSortedDirect(imgdict[name][2], imgdict[name][1], path_png, indexdict)
+                imageio.imwrite(os.path.join(path_png, sorteddirect, (imgdict[name][0] + '.png')), img)
+            else:
+                raise ValueError('Empty image was classified.')
+    # Makes terminal cleaner
+    print("")
+
+
+def newDataSet(ecotaxa_path, taxo_path, raw_path, meta_path, output_path, bad_list):
+    """Generates a new dataset consisting of organized images and csv metadata for public
+    learning and testing subsets, as well as a master csv file for identifying results.
+    NOTE: The master CSV file SHOULD NOT be distributed"""
+
+    # Confirm valid directories & generate output folder before starting
+    checkValidDirects(raw_path, ecotaxa_path, output_path, taxo_path, meta_path)
+
+    # Load data and translate it's categories
+    print("Building masterdata...", end='')
+    data = parseEcoTaxaDir(ecotaxa_path, status='validated')
+    data = translate(data, taxo_path)
+    print('Done!')
+
+    # Write master data to CSV, then reload (Acts as save/stop point)
+    data = generateMasterCSV(data, output_path, bad_list)
+    #data = readCSV(os.path.join(output_path, 'master.csv'))
+
+    # Generate images sorted into subsets
+    generateImages(data, raw_path, output_path)
+
+    # Split & write data into learning and testing CSVs
+    testdata, learndata = splitMasterData(data)
+    learn_direct = os.path.join(output_path, 'Learning')
+    test_direct = os.path.join(output_path, 'Testing')
+
+    makeSubsetCSV(testdata, meta_path, test_direct, 'testmeta.csv')
+    makeSubsetCSV(learndata, meta_path, learn_direct, 'learnmeta.csv')
+
+    # Produce csv of images excluded from subsets & label as excluded
+    excludedata = {}
+    for key in data:
+        excludedata[key] = []
+
+    for i in range(len(data['img_id'])):
+        if data['subset'][i] == 'exclude':
+            for key in data:
+                excludedata[key].append(data[key][i])
+    writeCSV(os.path.join(output_path, 'exclude.csv'), excludedata)
+
+
+def binary_search(a, x, lo=0, hi=None):
+    """Used to more rapidly search through large sorted data"""
+    hi = hi if hi is not None else len(a)
+    pos = bisect_left(a,x,lo,hi)
+    return (pos if pos != hi and a[pos] == x else -1)
+
+
+def validateDataSet(output_path):
+    """Confirms images exist in expected directories & on meta CSV files"""
+    subsetname = {
+        'test': 'Testing',
+        'learn' : 'Learning',
+        ' ' : 'Excluded',
+        'exclude' : 'Excluded'
+    }
+
+    # Use containing folder to get sub_directories
+    master_path = os.path.join(output_path, 'master.csv')
+    learn_path = os.path.join(output_path, 'Learning', 'learnmeta.csv')
+    test_path = os.path.join(output_path, 'Testing', 'testmeta.csv')
+    exclude_path = os.path.join(output_path, 'exclude.csv')
+
+    # Read data into memory
+    print("Loading data files: ")
+    masterdata = readCSV(master_path)
+    print('master.csv loaded!')
+    learndata = readCSV(learn_path)
+    learndata = sorted(learndata['img_name'])
+    print('learnmeta.csv loaded & sorted')
+    testdata = readCSV(test_path)
+    testdata = sorted(testdata['img_name'])
+    print('testmeta.csv loaded & sorted')
+    excludedata = readCSV(exclude_path)
+    excludedata = sorted(excludedata['img_name'])
+    print('learnmeta.csv loaded & sorted')
+
+    bad_imgs = []
+    bad_metas = []
+
+    masterlen = len(masterdata['img_name'])
+    count = 1;
+    for i in range(masterlen):
+        if count % 10000 == 0:
+            sys.stdout.write(F"\r Searching for img {str(count)} of {masterlen}")
+            sys.stdout.flush()
+
+        # Look for image
+        imgname = masterdata['img_name'][i] + '.png'
+        imgsub = subsetname[masterdata['subset'][i]]
+        searchdirect = os.path.join(output_path, imgsub, masterdata['category'][i])
+        found = False
+        for i in os.listdir(searchdirect):
+            if os.path.isfile(os.path.join(searchdirect, i, imgname)):
+                found = True
+                break
+        if not found:
+            bad_imgs.append(imgname)
+        found = True
+
+        # Look for metadata
+        if imgsub == 'Learning':
+            pos = binary_search(learndata,imgname)
+            if pos != -1 or learndata[pos] != imgname:
+                found = False
+        elif imgsub == 'Testing':
+            pos = binary_search(testdata, imgname)
+            if pos != -1 or testdata[pos] != imgname:
+                found = False
+        else:
+            pos = binary_search(excludedata, imgname)
+            if pos != -1 or excludedata[pos] != imgname:
+                found = False
+        if not found:
+            bad_metas.append(imgname)
+        count += 1
+
+    if (len(bad_imgs) and len(bad_metas)) == 0:
+        print('\nAll data is accounted for!')
+    else:
+        print('\nMissing Images:')
+        print(bad_imgs)
+        print('Missing Metadata: ')
+        print(bad_metas)
+
+
 if __name__ == "__main__":
     # Command line arguments
     parser = argparse.ArgumentParser()
@@ -378,6 +837,11 @@ if __name__ == "__main__":
         '-r', '--rawdirectory',
         required=True,
         help='<required> directory of IFCB folder containing raw photos'
+    )
+    parser.add_argument(
+        '-meta', '--metadatadirectory',
+        required=True,
+        help='<required> location of metadata to be paired with images'
     )
     parser.add_argument(
         '-o', '--outputdirectory',
@@ -404,20 +868,14 @@ if __name__ == "__main__":
         help='<optional> status of image to export (validated by default)',
         default='validated'
     )
+    parser.add_argument(
+        '-c', '--classes',
+        required=False,
+        nargs='+',
+        type=str,
+        help="<optional> classes to be excluded from the final dataset, separated by spaces"
+    )
 
     args = parser.parse_args()
-
-    #check provided directories exist & make img directory, save time if invalid
-    if checkValidDirects(args.rawdirectory, args.ecotaxadirectory, args.outputdirectory, args.taxfile):
-        translator = makeTrans(args.mode, args.taxfile)
-        print("Parsing TSV file(s)")
-        data = parseEcoTaxaDir(args.ecotaxadirectory, status=args.img_status)
-
-        # Remove annotations from data with predicted status
-        if args.img_status in ['predicted', 'dubious', 'unclassified']:
-            for i in range(len(data['hierarchy'])):
-                data['category'][i] = 'unclassified'
-                data['hierarchy'][i] = 'unclassified'
-
-        print('Number of images: ' + str(len(data['img_id'])))
-        extractDeepLearn(data, args.rawdirectory, translator, args.outputdirectory)
+    newDataSet(args.ecotaxadirectory, args.taxfile,args.rawdirectory, args.metadatadirectory, args.outputdirectory, args.classes)
+    #validateDataSet(args.outputdirectory)

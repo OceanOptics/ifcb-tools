@@ -45,11 +45,15 @@ python3 BuildScientificDataSet.py -p /path/to/cfg
 
 # BuildMLDataSet
 **Summary:**
-Converts exported tsv from local metadata into images titled by project ids
+Combines tsv files exported from ecotaxa, metadata(exported to csv files), & raw images into a dataset. This dataset is
+composed of a master.csv file linking images back to IFCB names, a learning & testing subset containing class-organized
+photos & a metadata csv for all photos within a subset. Images not placed into a subset are added to the Excluded
+folder.
 
 **Arguments:**
 * -e / --ecotaxadirectory (required) path to exported ecotaxa tsv files
 * -r / --rawdirectory (required) directory of IFCB folder containing raw binary metadata
+* -meta/ --metadirectory (required) directory of metadata CSVs
 * -o / --outputdirectory (optional) directory of desired output
     - default: ./Dataset in cwd
 * -m / --mode (optional) specifies image titling options from taxonomy spreadsheet
@@ -57,12 +61,10 @@ Converts exported tsv from local metadata into images titled by project ids
     - default: 'species'
 * -t / --taxfile (optional) directory of taxonomic translation spreadsheet
     - default: cwd
+* -c / --classes (optional) class names separated by spaces which should be removed from the dataset(added to excluded)
+    - default: classes with < 10 images
     
 ```
 example:
-python3 BuildMLDataSet.py -e /Ecotaxa/TSV/Directory -r /IFCB/Binary/Data/ -o /Image/Output/Directory -m group -t /Taxonomy/Excel/File
+python3 BuildMLDataSet.py -e /Path/To/Ecotaxa/Exportfiles -meta /Path/To/Metadata/CSVs -r /Path/to/Raw_Images -t /Path/To/Taxonomy_file -o /Desired/Output/Path
 ```
-
-# BuildPublicDataSet
-**IN PROGRESS:**
-Built off BuildMLDataSet, used to make datasets for public databases (i.e. Kaggle)
