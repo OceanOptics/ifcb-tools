@@ -321,6 +321,11 @@ def resumeFromDir(path_png):
 
 
 def extractDeepLearn(data, path_raw, translator, path_png):
+    # Clean list
+    index2rm = sorted([i for i, foo in enumerate(data['img_id']) if len(foo) < 24], reverse=True)
+    for k in data:
+        for i in index2rm:
+            del data[k][i]
     # Get each image by bin
     bin = [i[0:24] for i in data['img_id']]
     ubin = set(bin)
