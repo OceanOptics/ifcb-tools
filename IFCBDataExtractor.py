@@ -20,6 +20,7 @@ PATH_TO_IFCB_ANALYSIS = '/Users/nils/Documents/MATLAB/easyIFCB/IFCB_analysis/'
 PATH_TO_DIPUM = '/Users/nils/Documents/MATLAB/easyIFCB/DIPUM/'
 PATH_TO_EASY_IFCB = '/Users/nils/Documents/MATLAB/easyIFCB/'
 
+FLOWRATE = 0.25
 
 class BinExtractor:
 
@@ -30,16 +31,17 @@ class BinExtractor:
     matlab_parallel_flag = False
     environmental_data = None
 
-    def __init__(self, path_to_bin, path_to_output, path_to_environmental_csv, matlab_engine = None, matlab_parallel_flag=False):
+    def __init__(self, path_to_bin, path_to_output, path_to_environmental_csv = None, matlab_engine = None, matlab_parallel_flag=False):
         self.path_to_bin = path_to_bin
         self.path_to_output = path_to_output
         self.matlab_engine = matlab_engine
         self.matlab_parallel_flag = matlab_parallel_flag
-        #   the environmental file must be in csv format and the first line must be the column names
-        #   one of the column must be named "bin" and contain the bin id: D<yyyymmdd>T<HHMMSS>_IFCB<SN#>
-        self.environmental_data = pd.read_csv(path_to_environmental_csv, header=0, engine='c')
-        if 'bin' not in self.environmental_data:
-            raise ValueError('Missing column bin in environmental data file.')
+        if path_to_environmental_csv is not None:
+            #   the environmental file must be in csv format and the first line must be the column names
+            #   one of the column must be named "bin" and contain the bin id: D<yyyymmdd>T<HHMMSS>_IFCB<SN#>
+            self.environmental_data = pd.read_csv(path_to_environmental_csv, header=0, engine='c')
+            if 'bin' not in self.environmental_data:
+                raise ValueError('Missing column bin in environmental data file.')
 
     def __del__(self):
         if self.matlab_engine is not None:
@@ -100,8 +102,25 @@ class BinExtractor:
 
         return features
 
-    def extractInstrumentSettings(self, bin_name):
-        pass
+    def extractSampleHeader(self, bin_name):
+        # Parse hdr file
+        hdr = dict()
+        with open(os.path.join(self.path_to_bin, bin_name + '.hdr')) as myfile:
+            for line in myfile:
+                name, var = line.partition(":")[::2]
+                hdr[name.strip()] = var
+        # Compute volume sampled
+        look_time = float(hdr['runTime']) - float(hdr['inhibitTime'])   # seconds
+        volume_sampled = FLOWRATE * look_time / 60
+        # Format in Panda DataFrame
+        hdr = pd.DataFrame([[volume_sampled, float(hdr['SyringeSampleVolume']),
+                             int(hdr['PMTtriggerSelection_DAQ_MCConly']),
+                             float(hdr['PMTAhighVoltage']), float(hdr['PMTBhighVoltage']),
+                             float(hdr['PMTAtriggerThreshold_DAQ_MCConly']), float(hdr['PMTBtriggerThreshold_DAQ_MCConly'])]],
+                           columns=['VolumeSampled', 'VolumeSampleRequested',
+                                    'TriggerSelection', 'SSCGain', 'FLGain', 'SSCThreshold', 'FLThreshold'])
+
+        return hdr
 
     def queryEnviromentalData(self, bin_name):
         foo = self.environmental_data[self.environmental_data['bin'].str.match(bin_name)]
@@ -226,6 +245,17 @@ if __name__ == '__main__':
     # print(timeit.timeit('np.array(features)', setup=setup_features, number=1000))
     # print(timeit.timeit('np.array(features._data).reshape(features.size[::-1]).T', setup=setup_features, number=1000))
     # print(timeit.timeit('pd.DataFrame(np.array(features._data).reshape(features.size[::-1]).T, columns=FTR_COLUMN_NAMES)', setup=setup_features, number=1000))
+
+    # Test BinExtractor.extractSampleHeader
+    # input_path = '/Users/nils/Data/EXPORTS/IFCB107/raw/'
+    # output_path = '/Users/nils/Data/MachineLearning/EXPORTS_sci/'
+    # # bin_name = 'D20151119T072930_IFCB107'
+    # ifcb = BinExtractor(input_path, output_path)
+    # hdr = pd.DataFrame()
+    # list_bin = [b[0:-4] for b in os.listdir(ifcb.path_to_bin) if b[-4:] == '.roi']
+    # for b in tqdm(list_bin):
+    #     hdr = hdr.append(pd.concat([pd.DataFrame([b], columns=['SampleId']), ifcb.extractSampleHeader(b)], axis=1))
+    # hdr.to_csv(os.path.join(ifcb.path_to_output, 'EXPORTS_SamplesHeader.csv'), index=False, na_rep='NaN', float_format='%.2f')
 
 
     # Run BinExtractor for ML to classify dataset
