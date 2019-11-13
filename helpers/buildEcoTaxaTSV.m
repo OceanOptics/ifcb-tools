@@ -19,6 +19,7 @@ function buildEcoTaxaTSV(dir_features, dir_adc, bin_ids, dir_out, path_metadata,
 % Load metadata.csv v2 in a table
 bin_metadata = readtable(path_metadata);
 bin_metadata.Properties.VariableNames = {'bin_id', 'dt', 'lat', 'lon', 'depth', 'flag', 'source', 'other'};
+% % bin_metadata(end,:) = []; % For seto metadata file
 
 % Load features names for header
 f = fopen([dir_features bin_ids{1} '_fea_v2.csv'], 'r');
@@ -52,10 +53,12 @@ meta_headers = {{'img_file_name', '[t]'},... % 'img_rank', '[f]'},...
   {'process_script', '[t]'}, {'process_script_version', '[t]'},...
   {'process_library', '[t]'}, {'process_library_version', '[t]'},...
   {'process_date', '[t]'}, {'process_time', '[t]'},...
-  {'sample_id', '[t]'}, {'sample_source', '[t]'}, {'sample_flag', '[t]'},... % EXPORTS Specific from here
-  {'sample_cruise', '[t]'}, {'sample_vessel', '[t]'}, {'sample_reference', '[t]'},...
-  {'sample_station', '[t]'}, {'sample_cast', '[f]'}, {'sample_source_id', '[t]'},...
-  {'sample_culture_species', '[t]'}, {'sample_concentration', '[f]'}};
+  {'sample_id', '[t]'}, {'sample_source', '[t]'}, {'sample_flag', '[t]'},... % Seto Specific from here
+  {'sample_reference', '[t]'}, {'sample_culture_species', '[t]'}};
+%   {'sample_id', '[t]'}, {'sample_source', '[t]'}, {'sample_flag', '[t]'},... % EXPORTS Specific from here
+%   {'sample_cruise', '[t]'}, {'sample_vessel', '[t]'}, {'sample_reference', '[t]'},...
+%   {'sample_station', '[t]'}, {'sample_cast', '[f]'}, {'sample_source_id', '[t]'},...
+%   {'sample_culture_species', '[t]'}, {'sample_concentration', '[f]'}};
   % {'sample_id', '[t]'}, {'sample_source', '[t]'}, {'sample_flag', '[t]'},... % NAAMES 3 Specific from here
   % {'sample_cruise', '[t]'}, {'sample_vessel', '[t]'}, {'sample_reference', '[t]'},...
   % {'sample_station', '[t]'}, {'sample_cast', '[f]'}, {'sample_source_id', '[t]'},...
@@ -111,8 +114,8 @@ if par_flag; parfor_arg = Inf;
 else; parfor_arg = 0; end
 
 % Loop through each bin
-% for i_bin=1:size(bin_ids,1)
-parfor (i_bin=1:size(bin_ids,1), parfor_arg)
+for i_bin=1:size(bin_ids,1)
+% parfor (i_bin=1:size(bin_ids,1), parfor_arg)
   % Get ids
   feature_id = [bin_ids{i_bin} '_fea_v2.csv'];
   adc_id = [bin_ids{i_bin} '.adc'];
@@ -178,12 +181,12 @@ parfor (i_bin=1:size(bin_ids,1), parfor_arg)
 %   sample_profile_id = bin_metadata{8}{i_bm};
 %   sample_reference = bin_metadata{8}{i_bm};
   sample_reference = '';
-  sample_station = '';
-  sample_cast = '';
+%   sample_station = '';
+%   sample_cast = '';
 %   sample_niskin = '';
-  sample_source_id = '';
+%   sample_source_id = '';
 %   if ~isnan(bin_metadata{5}(i_bm)); sample_concentration = num2str(bin_metadata{5}(i_bm)); else sample_concentration = ''; end;
-  sample_concentration = '';
+%   sample_concentration = '';
   % sample_experiment_state = '';
   % sample_experiment_dilution = '';
   % sample_experiment_light_level = '';
@@ -203,8 +206,8 @@ parfor (i_bin=1:size(bin_ids,1), parfor_arg)
           sample_cast = bar{2};
         case 'source_id'
           sample_source_id = bar{2};
-%         case 'niskin_id'
-%           sample_niskin = bar{2};
+        case 'niskin_id'
+          sample_niskin = bar{2};
         % Experiments (PIC | Incubation)
         case {'T0/Tf', 't'}
           sample_experiment_state = bar{2};
@@ -262,7 +265,8 @@ parfor (i_bin=1:size(bin_ids,1), parfor_arg)
     case 'ali6000'
       sample_id = [global_metadata.meta.cruise_id '_ALI6000_S' sample_station '_' bin_id];
     case 'culture'
-      sample_id = ['CULTURE_' sample_culture_species '_' bin_id];
+%       sample_id = ['CULTURE_' sample_culture_species '_' bin_id];
+      sample_id = ['CULTURE_' sample_culture_species '_' sample_reference '_' bin_id];
     case 'minicosm'
       sample_id = ['MINICOSM_' sample_station '_' sample_reference '_' sample_source_id '_' bin_id];
     case 'test'
@@ -275,8 +279,10 @@ parfor (i_bin=1:size(bin_ids,1), parfor_arg)
       sample_id = [global_metadata.meta.cruise_id '_TOWFISH_' sample_reference '_' bin_id];
     case 'zootow'
       sample_id = [global_metadata.meta.cruise_id '_ZOOTOW_' sample_reference '_' bin_id];
-     case 'karen'
+    case 'karen'
       sample_id = [global_metadata.meta.cruise_id '_EXP_' sample_reference '_' bin_id];
+    case 'discrete'
+      sample_id = ['DISCRETE_' bin_id];
     otherwise
       fprintf(['Unknow sample_source ' bin_id ' in metadata.csv\n']);
       sample_id = bin_id;
@@ -295,10 +301,12 @@ parfor (i_bin=1:size(bin_ids,1), parfor_arg)
             process_script, process_script_version,...
             process_library, process_library_version,...
             process_date, process_time,...
-            sample_id, sample_source, sample_flag,...% EXPORTS Specific
-            sample_cruise, sample_vessel, sample_reference,...
-            sample_station, sample_cast, sample_source_id,...
-            sample_culture_species, sample_concentration);
+            sample_id, sample_source, sample_flag,...% Seto Specific
+            sample_reference, sample_culture_species);
+%             sample_id, sample_source, sample_flag,...% EXPORTS Specific
+%             sample_cruise, sample_vessel, sample_reference,...
+%             sample_station, sample_cast, sample_source_id,...
+%             sample_culture_species, sample_concentration);
             % sample_id, sample_source, sample_flag,...% NAAMES 3 Specific
             % sample_cruise, sample_vessel, sample_reference,...
             % sample_station, sample_cast, sample_source_id,...

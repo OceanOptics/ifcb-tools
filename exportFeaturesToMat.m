@@ -105,23 +105,26 @@ foo3 = cell(n, 1);
 parfor (i=1:n, parfor_arg)
   d = importADC([cfg.path.in bin{i} '.adc']);
   % adc = {'FluoPeak', 'FluoInt', 'ScatPeak', 'ScatInt'};
-  foo3{i} = [d.itrigger, d.PMTA, d.PMTB, d.peakA, d.peakB];
+  foo3{i} = [d.itrigger, d.PMTA, d.PMTB, d.peakA, d.peakB, d.timeOfFlight];
 end
 % Synchronize ADC and FTR data
 % ROI number on FTR correspond to the line number of the ADC
 % Trick ADC comports n identical lines when n roi are selected on one
-% image. If n > 1 then the peak A and B are for one of the ROI and PMT A
+% image. If n > 1 then the peak A and B and PMT A
 % and B are for one of the ROI only but which one ??? Probably the one
 % closest to the most probable spot.
 % They might be ADC for which there is no ROI, the particle that trigger
 % was not detected by the camera.
-adc = array2table(cell(n,5), 'VariableNames', {'ScatInt', 'FluoInt', ...
-                  'ScatPeak', 'FluoPeak', 'NumberOfROIinTrigger'});
+adc = array2table(cell(n,6), 'VariableNames', {'SSCIntegrated', 'FLIntegrated', ...
+                  'SSCPeak', 'FLPeak', 'TimeOfFlight', 'NumberOfROIinTrigger'});
+adc.Properties.VariableUnits = {'V', 'V', 'V', 'V', 'us', ''};
 for i = 1:n
- adc.ScatInt{i} = foo3{i}(ftr.ROIid{i}, 2);
- adc.FluoInt{i} = foo3{i}(ftr.ROIid{i}, 3);
- adc.ScatPeak{i} = foo3{i}(ftr.ROIid{i}, 4);
- adc.FluoPeak{i} = foo3{i}(ftr.ROIid{i}, 5);
+ adc.SSCIntegrated{i} = foo3{i}(ftr.ROIid{i}, 2);
+ adc.FLIntegrated{i} = foo3{i}(ftr.ROIid{i}, 3);
+ adc.SSCPeak{i} = foo3{i}(ftr.ROIid{i}, 4);
+ adc.FLPeak{i} = foo3{i}(ftr.ROIid{i}, 5);
+ adc.TimeOfFlight{i} = foo3{i}(ftr.ROIid{i}, 6);
+ adc.TimeOfFlight{i}(adc.TimeOfFlight{i}==-999) = NaN;
  adc.NumberOfROIinTrigger{i} = sum(foo3{i}(ftr.ROIid{i}, 1) == foo3{i}(ftr.ROIid{i}, 1)')';
 end
 fprintf('Done\n'); toc;
@@ -131,6 +134,10 @@ fprintf('EDIT importMetadata TO GET stn_id AS number or string.\n');
 md = importMetadata(cfg.path.meta);
 % Sync metadata index on bin
 [~, i] = intersect(md.id, bin);
+if height(md) ~= length(bin)
+  fprintf('ERROR: bins present in metadata have no features exported and will be missing from the generated dataset.\n');
+  for i=find(~ismember(md.id, bin)); fprintf('\t%s\n', md.id{i}); end
+end
 md = md(i,:);
 % Check sync
 for i=1:n
@@ -140,10 +147,16 @@ for i=1:n
 end
 
 %% Build full tables
+% with metadata
 ifcb = [md hdr ftr ftr_add adc];
+% without metadata
+% ifcb = [table(bin,'VariableNames', {'id'}) hdr ftr ftr_add adc];
+% Save data
+if ~isdir(cfg.path.wk); mkdir(cfg.path.wk); end
 save([cfg.path.wk 'meta_hdr_ftr_adc.mat'], 'ifcb');
 % load([cfg.path.wk 'meta_hdr_ftr_adc.mat'], 'ifcb');
 
+return
 %% Build light table
 % keep only good inline
 row_sel = strcmp(ifcb.type,'inline') & ifcb.flag == 1 & ifcb.concentration == 1;

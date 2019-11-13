@@ -3,7 +3,7 @@ function [slope, intercept, psd, bin_means] = find_psd_slope(esd, bin_edges)
 %
 % INPUT:
 %   ESD <Nx1 double> Equivalent Spherical Diameter (um)
-%   bin_edges <1xM double> edges of each size bin (um)
+%   bin_edges <1xM double> edges of each size bin (um) (optional)
 %   
 % OUTPUT:
 %   slope <double> Slope of the PSD
@@ -25,7 +25,11 @@ if nargin < 2
   q=exp(1/n*log(dlim(2)/dlim(1)));
   bin_edges = dlim(1)*q.^(0:n);
 end
-bin_means = (bin_edges(2:end) + bin_edges(1:end-1)) / 2;
+% Arithmetic mean (for linear spaced binned)
+% bin_means = (bin_edges(2:end) + bin_edges(1:end-1)) / 2;
+% Geometric mean (for log spaced binned)
+bin_means = sqrt(bin_edges(2:end) .* bin_edges(1:end-1));
+
 
 % Compute PSD
 psd = NaN(1,size(bin_edges,2)-1);
