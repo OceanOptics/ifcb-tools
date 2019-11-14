@@ -14,7 +14,7 @@ if parallel_flag; parflag = Inf; else; parflag = 0; end
 
 % Get images
 targets = get_images_fromROI([path_to_bin filesep bin_name '.roi']);
-n = length(targets.image);
+n = length(targets.targetNumber);
 
 % Update config
 cfg = configure_test(); % updated for V4
@@ -27,10 +27,15 @@ if min_feature_flag; feature_data = zeros(n,3, 'uint32');
 else; feature_data = NaN(n, 18); end
 
 % Quick parfor acceleration
-targets_image = targets.image;
-targets_targetNumber = targets.targetNumber;
+if n > 0
+  targets_image = targets.image;
+  targets_targetNumber = targets.targetNumber;
+else
+  targets_image = {};
+  targets_targetNumber = [];
+end
 
-parfor(i=1:length(targets.image), parflag)
+parfor(i=1:n, parflag)
 % for i=1:length(targets.image)
   % Configure Target
   target = {};

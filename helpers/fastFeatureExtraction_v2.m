@@ -12,7 +12,7 @@ if parallel_flag; parflag = Inf; else; parflag = 0; end
 
 % Get images
 targets = get_images_fromROI([path_to_bin filesep bin_name '.roi']);
-n = length(targets.image);
+n = length(targets.targetNumber);
 
 % Update config
 cfg = configure();
@@ -24,7 +24,7 @@ cfg.props2sum = {}; % Done directly below
 if min_feature_flag; feature_data = zeros(n,3, 'uint32');
 else; feature_data = NaN(n, 14); end
 
-parfor(i=1:length(targets.image), parflag)
+parfor(i=1:n, parflag)
   % Configure Target
   target = {};
   target.config = cfg;
