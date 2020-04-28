@@ -1,6 +1,4 @@
-# The script is intended to extract TSV data from Ecotaxa
-
-
+#!/usr/bin/env python
 import argparse
 import requests
 import sys
@@ -14,11 +12,6 @@ from time import sleep
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 MAXQUEUESIZE = 5
-
-
-#TO-DO:
-# See if SSL verification is needed
-# Allow for export with names, path, and export parameters
 
 
 def loginUser(session, usr, auth=None):
@@ -191,50 +184,37 @@ if __name__ == "__main__":
     parser.add_argument(
         '-u', '--user',
         required=True,
-        help='<required> email of Ecotaxa account'
+        help='<required> Set email of EcoTaxa account.'
         )
     parser.add_argument(
         '-p', '--path',
         required=False,
-        help='<optional> path of export'
+        help='<optional> Set download directory. The download directory is the directory where all files will be saved.'
         )
     parser.add_argument(
         '-i', '--ids',
         nargs='+',
         type=int,
-        help="<required> ids of projects to be downloaded, separated by space(0 for all projects)"
+        help="<optional> Set project identification numbers to be downloaded. Multiple projects can be given (must be separated by a space). If not provided all projects from the EcoTaxa account are downloaded."
         )
     parser.add_argument(
         '-a', '--authorization',
         required =False,
-        help='<optional> provide password for Ecotaxa via command-line rather than script'
+        help='<optional> Provide EcoTaxa password through command line. Not recommended.'
     )
 
-
     args = parser.parse_args()
-    user = args.user
-    ids = args.ids
-    names = args.ids
-    path = args.path
-    auth = args.authorization
 
+    print(args.ids)
+
+    if not os.path.isdir(args.path):
+        print("Error: Path to download directory does not exist.")
+        sys.exit()
 
     with requests.Session() as r:
-        loginUser(r, user, auth)
-        if path is not None:
-            try:
-                os.chdir(path)
-            except FileNotFoundError:
-                print("Error: Provided directory doesn't exist")
-                sys.exit()
-
-        if len(ids) == 1 and ids[0] == 0:
-            ids = fetchIDs(r)
-        else:
-            ids = fetchIDs(r, ids)
-
-        if ids is not None:
-            downloadProjs(r, ids, path)
-            print("Process successfully completed, good-bye!\n")
-        else:
-            print("Error: No matching project")
+        loginUser(r, args.user, args.authorization)
+        fetched_ids = fetchIDs(r, args.ids)
+        if fetched_ids is None:
+            print('Error: No matching project.')
+            sys.exit()
+        downloadProjs(r, fetched_ids, args.path)

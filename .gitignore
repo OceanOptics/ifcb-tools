@@ -103,5 +103,8 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-# Configuration file
-BuildScientificDataSet.cfg
+# Specific to project
+ifcb-analysis*
+DIPUM/
+test/
+data/
