@@ -9,8 +9,18 @@ function [data] = importSCI(path_to_sci_dir)
 data = readtable([path_to_sci_dir filesep 'metadata.csv']);
 data.DateTime = datenum(data.DateTime, 'yyyy/mm/dd HH:MM:SS');
 data.Type = categorical(data.Type);
-data.Reference = categorical(strrep(data.Reference, 'NaN', ''));
-data.Station = categorical(strrep(data.Station, 'NaN', ''));
+if ismember('Reference', data.Properties.VariableNames)
+  data.Reference = categorical(strrep(data.Reference, 'NaN', ''));
+end
+if ismember('Station', data.Properties.VariableNames)
+  data.Station = categorical(strrep(data.Station, 'NaN', ''));
+end
+if ismember('Epoch', data.Properties.VariableNames)
+  data.Epoch = categorical(strrep(data.Epoch, 'NaN', ''));
+end
+if ismember('Source', data.Properties.VariableNames)
+  data.Source = categorical(strrep(data.Source, 'NaN', ''));
+end
 if ismember('Validated', data.Properties.VariableNames)
   data.Properties.VariableNames{'Validated'} = 'AnnotationValidated';
 end
@@ -18,6 +28,11 @@ end
 n = height(data);
 for i=progress(1:n, 'Title', 'Reading SCI')
   bin_name = data.BinId{i};
+  % Skip missing files
+  if ~isfile([path_to_sci_dir filesep bin_name '_sci.csv'])
+    fprintf('Skipped %s\n', bin_name);
+    continue;
+  end
   % Read bin data
   d = readtable([path_to_sci_dir filesep bin_name '_sci.csv']);
   if ismember('Status', d.Properties.VariableNames)

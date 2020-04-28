@@ -31,6 +31,7 @@ parfor (i=1:size(bins,1), parfor_arg)
         if rm_tmp_flag; movefile(path_images, dir_out);
         else; copyfile(path_images, dir_bin); end
       else
+%         rmdir(path_images); % Remove empty directory
         missing_images = true;
       end
     else
@@ -39,11 +40,12 @@ parfor (i=1:size(bins,1), parfor_arg)
 
     % Copy/Move features
     path_tsv = [dir_tsv 'ecotaxa_' bin '.tsv'];
-    if exist(path_tsv, 'file')
-      if rm_tmp_flag; movefile(path_tsv, dir_bin);
-      else; copyfile(path_tsv, dir_bin); end;
-    else
+    if ~exist(path_tsv, 'file')
       missing_tsv = true;
+    end
+    if ~missing_tsv && ~missing_images
+      if rm_tmp_flag; movefile(path_tsv, dir_bin);
+      else; copyfile(path_tsv, dir_bin); end
     end
     
     % Check any missing file

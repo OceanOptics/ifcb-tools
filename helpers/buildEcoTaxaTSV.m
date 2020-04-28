@@ -131,6 +131,10 @@ for i_bin=1:size(bin_ids,1)
     end;
   % Get index in metadata of current bin  
   i_bm = find(strcmp(bin_metadata.bin_id, bin_id));
+  if isempty(i_bm)
+    fprintf('%s build_tsv NO METADATA %s >>> SKIPPING \n', utcdate(now()), bin_id);
+    continue;
+  end
   
   % Load features
   if exist([dir_features feature_id], 'file')
@@ -165,6 +169,10 @@ for i_bin=1:size(bin_ids,1)
   if isnan(bin_metadata.lon(i_bm)); object_lon = '-68.6704788';
   else; object_lon = num2str(bin_metadata.lon(i_bm)); end
   % No sampling time is set to bin_id as it's probably from inline
+  if ~iscell(bin_metadata.dt)
+    bin_metadata.dt = num2cell(bin_metadata.dt);
+    bin_metadata.dt(cellfun(@isnan, bin_metadata.dt)) = {[]};
+  end
   if isempty(bin_metadata.dt{i_bm}); object_date = bin_id(2:9); object_time = bin_id(11:16);
   else; object_date = [bin_metadata.dt{i_bm}(1:4) bin_metadata.dt{i_bm}(6:7) bin_metadata.dt{i_bm}(9:10)];
         object_time = [bin_metadata.dt{i_bm}(12:13) bin_metadata.dt{i_bm}(15:16) bin_metadata.dt{i_bm}(18:19)]; end
@@ -180,7 +188,8 @@ for i_bin=1:size(bin_ids,1)
   sample_flag = flagGet(bin_metadata.flag(i_bm));
 %   sample_profile_id = bin_metadata{8}{i_bm};
 %   sample_reference = bin_metadata{8}{i_bm};
-  sample_reference = '';
+  sample_reference = bin_metadata.other{i_bm};
+%   sample_reference = '';
 %   sample_station = '';
 %   sample_cast = '';
 %   sample_niskin = '';
