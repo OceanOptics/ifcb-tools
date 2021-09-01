@@ -11,8 +11,13 @@ IFCB Tools provide tools to extract raw IFCB data to matlab files and incorporat
 ## Installation
 Install python dependencies
 
-    pip install pandas numpy PIL beautifulsoup4 imageio
+    pip install pandas numpy PIL beautifulsoup4 imageio matlab
+
+Install matlab Engine API for python (https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html)
     
+    cd /Applications/MATLAB_R2020b.app/extern/engines/python
+    python setup.py install
+
 Download IFCB Analysis code required to extract features from the IFCB.
     
     cd ifcb-tools

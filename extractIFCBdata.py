@@ -16,25 +16,73 @@ import pandas as pd
 from pandas.api.types import union_categoricals
 import numpy as np
 import os, glob
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import matlab.engine
 from tqdm import tqdm
 import sys
+import re
 
 
-ADC_COLUMN_NAMES = ['TriggerId', 'ADCTime', 'SSCIntegrated', 'FLIntegrated', 'PMTC', 'PMTD', 'SSCPeak', 'FLPeak', 'PeakC', 'PeakD',
-                    'TimeOfFlight', 'GrabTimeStart', 'GrabTimeEnd', 'ImageX', 'ImageY', 'ImageWidth', 'ImageHeight', 'StartByte',
+__version__ = '0.2.0'
+
+
+ADC_COLUMN_NAMES = ['TriggerId', 'ADCTime', 'SSCIntegrated', 'FLIntegrated', 'PMTC', 'PMTD', 'SSCPeak', 'FLPeak',
+                    'PeakC', 'PeakD',
+                    'TimeOfFlight', 'GrabTimeStart', 'GrabTimeEnd', 'ImageX', 'ImageY', 'ImageWidth', 'ImageHeight',
+                    'StartByte',
                     'ComparatorOut', 'StartPoint', 'SignalLength', 'Status', 'RunTime', 'InhibitTime']
 ADC_COLUMN_SEL = ['SSCIntegrated', 'FLIntegrated', 'SSCPeak', 'FLPeak', 'TimeOfFlight',
                   'ImageX', 'ImageY', 'ImageWidth', 'ImageHeight', 'NumberImagesInTrigger']
 HDR_COLUMN_NAMES = ['VolumeSampled', 'VolumeSampleRequested',
                     'TriggerSelection', 'SSCGain', 'FLGain', 'SSCThreshold', 'FLThreshold']
 FTR_V2_COLUMN_NAMES = ['ImageId', 'Area', 'NumberBlobsInImage',
-                       'EquivalentDiameter', 'FeretDiameter', 'MinorAxisLength', 'MajorAxisLength', 'Perimeter', 'Biovolume',
-                       'TextureContrast', 'TextureGrayLevel', 'TextureEntropy', 'TextureSmoothness', 'TextureUniformity']
-FTR_V4_COLUMN_NAMES = ['ImageId', 'Area', 'NumberBlobsInImage', 'EquivalentDiameter', 'MinFeretDiameter', 'MaxFeretDiameter',
-                       'MinorAxisLength', 'MajorAxisLength', 'Perimeter', 'Biovolume', 'ConvexArea', 'ConvexPerimeter',
-                       'SurfaceArea', 'Eccentricity', 'Extent', 'Orientation', 'RepresentativeWidth', 'Solidity']
+                       'EquivalentDiameter', 'FeretDiameter', 'MinorAxisLength', 'MajorAxisLength', 'Perimeter',
+                       'Biovolume',
+                       'TextureContrast', 'TextureGrayLevel', 'TextureEntropy', 'TextureSmoothness',
+                       'TextureUniformity']
+BLOB_FTR_V4_COLUMN_NAMES = ['ImageId', 'Area', 'NumberBlobsInImage']
+SLIM_FTR_V4_COLUMN_NAMES = ['ImageId', 'Area', 'NumberBlobsInImage', 'EquivalentDiameter', 'MinFeretDiameter',
+                            'MaxFeretDiameter',
+                            'MinorAxisLength', 'MajorAxisLength', 'Perimeter', 'Biovolume', 'ConvexArea',
+                            'ConvexPerimeter',
+                            'SurfaceArea', 'Eccentricity', 'Extent', 'Orientation', 'RepresentativeWidth', 'Solidity']
+ALL_FTR_V4_COLUMN_NAMES = ['ImageId', 'Area', 'NumberBlobsInImage',
+                           'MajorAxisLength', 'MinorAxisLength', 'Eccentricity', 'Orientation', 'ConvexArea',
+                           'EquivDiameter', 'Solidity', 'Extent', 'Perimeter', 'ConvexPerimeter',
+                           'maxFeretDiameter', 'minFeretDiameter', 'BoundingBox_xwidth', 'BoundingBox_ywidth',
+                           'texture_average_gray_level', 'texture_average_contrast', 'texture_smoothness',
+                           'texture_third_moment', 'texture_uniformity', 'texture_entropy',
+                           'moment_invariant1', 'moment_invariant2', 'moment_invariant3', 'moment_invariant4',
+                           'moment_invariant5', 'moment_invariant6', 'moment_invariant7',
+                           'shapehist_mean_normEqD', 'shapehist_median_normEqD', 'shapehist_skewness_normEqD',
+                           'shapehist_kurtosis_normEqD', 'RWhalfpowerintegral', 'RWcenter2total_powerratio',
+                           'Biovolume', 'SurfaceArea', 'RepresentativeWidth', 'summedArea', 'summedBiovolume',
+                           'summedConvexArea', 'summedConvexPerimeter', 'summedMajorAxisLength',
+                           'summedMinorAxisLength', 'summedPerimeter', 'summedSurfaceArea',
+                           'H180', 'H90', 'Hflip', 'B180', 'B90', 'Bflip',
+                           'RotatedBoundingBox_xwidth', 'RotatedBoundingBox_ywidth', 'rotated_BoundingBox_solidity',
+                           'Wedge01', 'Wedge02', 'Wedge03', 'Wedge04', 'Wedge05', 'Wedge06', 'Wedge07', 'Wedge08',
+                           'Wedge09', 'Wedge10', 'Wedge11', 'Wedge12', 'Wedge13', 'Wedge14', 'Wedge15', 'Wedge16',
+                           'Wedge17', 'Wedge18', 'Wedge19', 'Wedge20', 'Wedge21', 'Wedge22', 'Wedge23', 'Wedge24',
+                           'Wedge25', 'Wedge26', 'Wedge27', 'Wedge28', 'Wedge29', 'Wedge30', 'Wedge31', 'Wedge32',
+                           'Wedge33', 'Wedge34', 'Wedge35', 'Wedge36', 'Wedge37', 'Wedge38', 'Wedge39', 'Wedge40',
+                           'Wedge41', 'Wedge42', 'Wedge43', 'Wedge44', 'Wedge45', 'Wedge46', 'Wedge47', 'Wedge48',
+                           'Ring01', 'Ring02', 'Ring03', 'Ring04', 'Ring05', 'Ring06', 'Ring07', 'Ring08', 'Ring09',
+                           'Ring10', 'Ring11', 'Ring12', 'Ring13', 'Ring14', 'Ring15', 'Ring16', 'Ring17', 'Ring18',
+                           'Ring19', 'Ring20', 'Ring21', 'Ring22', 'Ring23', 'Ring24', 'Ring25', 'Ring26', 'Ring27',
+                           'Ring28', 'Ring29', 'Ring30', 'Ring31', 'Ring32', 'Ring33', 'Ring34', 'Ring35', 'Ring36',
+                           'Ring37', 'Ring38', 'Ring39', 'Ring40', 'Ring41', 'Ring42', 'Ring43', 'Ring44', 'Ring45',
+                           'Ring46', 'Ring47', 'Ring48', 'Ring49', 'Ring50',
+                           'HOG01', 'HOG02', 'HOG03', 'HOG04', 'HOG05', 'HOG06', 'HOG07', 'HOG08', 'HOG09', 'HOG10',
+                           'HOG11', 'HOG12', 'HOG13', 'HOG14', 'HOG15', 'HOG16', 'HOG17', 'HOG18', 'HOG19', 'HOG20',
+                           'HOG21', 'HOG22', 'HOG23', 'HOG24', 'HOG25', 'HOG26', 'HOG27', 'HOG28', 'HOG29', 'HOG30',
+                           'HOG31', 'HOG32', 'HOG33', 'HOG34', 'HOG35', 'HOG36', 'HOG37', 'HOG38', 'HOG39', 'HOG40',
+                           'HOG41', 'HOG42', 'HOG43', 'HOG44', 'HOG45', 'HOG46', 'HOG47', 'HOG48', 'HOG49', 'HOG50',
+                           'HOG51', 'HOG52', 'HOG53', 'HOG54', 'HOG55', 'HOG56', 'HOG57', 'HOG58', 'HOG59', 'HOG60',
+                           'HOG61', 'HOG62', 'HOG63', 'HOG64', 'HOG65', 'HOG66', 'HOG67', 'HOG68', 'HOG69', 'HOG70',
+                           'HOG71', 'HOG72', 'HOG73', 'HOG74', 'HOG75', 'HOG76', 'HOG77', 'HOG78', 'HOG79', 'HOG80',
+                           'HOG81', 'Area_over_PerimeterSquared', 'Area_over_Perimeter', 'H90_over_Hflip',
+                           'H90_over_H180', 'Hflip_over_H180', 'summedConvexPerimeter_over_Perimeter']
 PATH_TO_IFCB_ANALYSIS_V2 = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ifcb-analysis-master')
 PATH_TO_IFCB_ANALYSIS_V3 = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ifcb-analysis-features_v3')
 PATH_TO_DIPUM = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'DIPUM')
@@ -43,19 +91,26 @@ PATH_TO_MATLAB_FUNCTIONS = os.path.join(os.path.dirname(os.path.abspath(__file__
 IFCB_FLOW_RATE = 0.25
 
 
+def upper_to_under(var):
+    """
+    Insert underscore before upper case letter followed by lower case letter and lower case all sentence.
+    """
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', re.sub('(.)([A-Z][a-z]+)', r'\1_\2', var)).lower()
+
+
 class BinExtractor:
 
-    def __init__(self, path_to_bin, path_to_output, path_to_environmental_csv=None,
+    def __init__(self, path_to_bin, path_to_environmental_csv=None,
                  path_to_ecotaxa_tsv=None, path_to_taxonomic_grouping_csv=None,
                  matlab_engine=None, matlab_parallel_flag=False):
         self.path_to_bin = path_to_bin
-        self.path_to_output = path_to_output
         self.matlab_engine = matlab_engine
         self.matlab_parallel_flag = matlab_parallel_flag
         if path_to_environmental_csv:
             #   the environmental file must be in csv format and the first line must be the column names
             #   one of the column must be named "bin" and contain the bin id: D<yyyymmdd>T<HHMMSS>_IFCB<SN#>
-            self.environmental_data = pd.read_csv(path_to_environmental_csv, header=0, engine='c')
+            self.environmental_data = pd.read_csv(path_to_environmental_csv, header=0, engine='c',
+                                                  parse_dates=['DateTime'])
             if 'bin' not in self.environmental_data:
                 raise ValueError('Missing column bin in environmental data file.')
         else:
@@ -68,10 +123,15 @@ class BinExtractor:
         if self.matlab_engine is not None:
             self.matlab_engine.quit()
 
-    def extract_images_and_cytometry(self, bin_name, write_image=True):
-        if not os.path.exists(self.path_to_output):
-            os.makedirs(self.path_to_output)
-        path_to_png = os.path.join(self.path_to_output, bin_name)
+    def extract_images_and_cytometry(self, bin_name, write_images_to=None,
+                                     with_scale_bar=False, scale_bar_resolution=3.4):
+        if with_scale_bar:
+            # Prepare Scale Bar
+            sb_height = round(1.2 * scale_bar_resolution)  # pixel
+            sb_width = round(10 * scale_bar_resolution)  # um
+            sb_offset = 2 + sb_height / 2
+            sb_font = ImageFont.truetype("Times New Roman", 10)  # font is required to anchor text
+
         # Parse ADC File
         adc = pd.read_csv(os.path.join(self.path_to_bin, bin_name + '.adc'), names=ADC_COLUMN_NAMES, engine='c',
                           na_values='-999.00000')
@@ -80,10 +140,13 @@ class BinExtractor:
         # Get Number of ROI within one trigger
         adc['NumberImagesInTrigger'] = [sum(adc['TriggerId'] == x) for x in adc['TriggerId']]
         rows_to_remove = list()
-        if write_image:
+        if write_images_to is not None:
+            # Set path
+            if not os.path.exists(write_images_to):
+                os.makedirs(write_images_to)
+            path_to_png = os.path.join(write_images_to, bin_name)
             # Open ROI File
             roi = np.fromfile(os.path.join(self.path_to_bin, bin_name + '.roi'), 'uint8')
-            bin_name_parts = bin_name.split('_')
             if not os.path.isdir(path_to_png):
                 os.mkdir(path_to_png)
             for d in adc.itertuples():
@@ -91,22 +154,28 @@ class BinExtractor:
                     # Save Image
                     img = roi[d.StartByte:d.EndByte].reshape(d.ImageHeight, d.ImageWidth)
                     # Save with ImageIO (slower)
-                    # imageio.imwrite(os.path.join(path_to_png, '%s%sP%05d.png' % (bin_name_parts[1], bin_name_parts[0], d.Index)), img)
+                    # imageio.imwrite(os.path.join(path_to_png, f'{bin_name}_{d.Index:05d}.png', img)
                     # Save with PILLOW
-                    Image.fromarray(img).save(
-                        os.path.join(path_to_png, '%s%sP%05d.png' % (bin_name_parts[1], bin_name_parts[0], d.Index)),
-                        'PNG')
+                    img = Image.fromarray(img)
+                    if with_scale_bar:
+                        draw = ImageDraw.Draw(img)
+                        draw.line((2, d.ImageHeight - sb_offset, 2 + sb_width, d.ImageHeight - sb_offset), fill=0,
+                                  width=sb_height)
+                        draw.text((2 + sb_width / 2, d.ImageHeight - sb_offset), '10 µm', fill=0, anchor='md',
+                                  font=sb_font)
+                    img.save(os.path.join(path_to_png, f'{bin_name}_{d.Index:05d}.png'), 'PNG')
+                    # deprecated image name:  f'{bin_name_parts[1]}{bin_name_parts[0]}P{d.Index:05d}.png'; bin_name_parts = bin_name.split('_')
                 else:
-                    # Record lines to remove from adc
-                    # rows_to_remove.append(d.Index)
+                    # Remove line from adc
                     adc.drop(index=d.Index, inplace=True)
         else:
             for d in adc.itertuples():
                 if d.StartByte == d.EndByte:
-                    # Record lines to remove from adc
+                    # Remove line from adc
                     adc.drop(index=d.Index, inplace=True)
         # Keep only columns of interest
         adc = adc[ADC_COLUMN_SEL].astype({'NumberImagesInTrigger': 'uint8'})
+        adc.index = adc.index.astype('uint32')
         return adc
 
     def extract_header(self, bin_name):
@@ -117,13 +186,14 @@ class BinExtractor:
                 name, var = line.partition(":")[::2]
                 hdr[name.strip()] = var
         # Compute volume sampled
-        look_time = float(hdr['runTime']) - float(hdr['inhibitTime'])   # seconds
+        look_time = float(hdr['runTime']) - float(hdr['inhibitTime'])  # seconds
         volume_sampled = IFCB_FLOW_RATE * look_time / 60
         # Format in Panda DataFrame
         hdr = pd.DataFrame([[volume_sampled, float(hdr['SyringeSampleVolume']),
                              int(hdr['PMTtriggerSelection_DAQ_MCConly']),
                              float(hdr['PMTAhighVoltage']), float(hdr['PMTBhighVoltage']),
-                             float(hdr['PMTAtriggerThreshold_DAQ_MCConly']), float(hdr['PMTBtriggerThreshold_DAQ_MCConly'])]],
+                             float(hdr['PMTAtriggerThreshold_DAQ_MCConly']),
+                             float(hdr['PMTBtriggerThreshold_DAQ_MCConly'])]],
                            columns=HDR_COLUMN_NAMES)
         return hdr
 
@@ -140,16 +210,21 @@ class BinExtractor:
                                    os.path.join(PATH_TO_IFCB_ANALYSIS_V2, 'feature_extraction', 'biovolume'),
                                    PATH_TO_MATLAB_FUNCTIONS,
                                    PATH_TO_DIPUM)
-        features = self.matlab_engine.fastFeatureExtraction(self.path_to_bin, bin_name, minimal_feature_flag, self.matlab_parallel_flag, nargout=1)
+        features = self.matlab_engine.fastFeatureExtraction(self.path_to_bin, bin_name, minimal_feature_flag,
+                                                            self.matlab_parallel_flag, nargout=1)
         features = pd.DataFrame(np.array(features._data).reshape(features.size[::-1]).T,
                                 columns=FTR_V2_COLUMN_NAMES)
         features = features.astype({'ImageId': 'uint32', 'Area': 'uint64', 'NumberBlobsInImage': 'uint16'})
         features.set_index('ImageId', inplace=True)
         return features
 
-    def extract_features_v4(self, bin_name, minimal_feature_flag=False):
-        """ Extract features based on code in Development/Heidi_explore/blobs_for_biovolume
-            from branch features_v3 of ifcb-analysis """
+    def extract_features_v4(self, bin_name, level=1):
+        """
+        Extract features based on code in Development/Heidi_explore/blobs_for_biovolume from branch features_v3 of ifcb-analysis
+        The features are based on blob_v4
+
+        level: 0: BLOB, 1: SLIM (recommended for ML or SCI), 2: ALL (recommended for EcoTaxa)
+        """
         if self.matlab_engine is None:
             # Start Matlab engine and add IFCB_analysis
             self.matlab_engine = matlab.engine.start_matlab()
@@ -158,13 +233,21 @@ class BinExtractor:
                                    os.path.join(PATH_TO_IFCB_ANALYSIS_V3, 'feature_extraction'),
                                    os.path.join(PATH_TO_IFCB_ANALYSIS_V3, 'feature_extraction', 'blob_extraction'),
                                    os.path.join(PATH_TO_IFCB_ANALYSIS_V3, 'feature_extraction', 'biovolume'),
-                                   os.path.join(PATH_TO_IFCB_ANALYSIS_V3, 'Development', 'Heidi_explore', 'blobs_for_biovolume'),
+                                   os.path.join(PATH_TO_IFCB_ANALYSIS_V3, 'Development', 'Heidi_explore',
+                                                'blobs_for_biovolume'),
                                    PATH_TO_MATLAB_FUNCTIONS,
                                    PATH_TO_DIPUM)
-        self.matlab_engine.cd(os.path.join(PATH_TO_IFCB_ANALYSIS_V3, 'Development', 'Heidi_explore', 'blobs_for_biovolume'))
-        features = self.matlab_engine.fastFeatureExtraction_v4(self.path_to_bin, bin_name, minimal_feature_flag, self.matlab_parallel_flag, nargout=1)
-        features = pd.DataFrame(np.array(features._data).reshape(features.size[::-1]).T,
-                                columns=FTR_V4_COLUMN_NAMES)
+        self.matlab_engine.cd(
+            os.path.join(PATH_TO_IFCB_ANALYSIS_V3, 'Development', 'Heidi_explore', 'blobs_for_biovolume'))
+        features = self.matlab_engine.fastFeatureExtraction_v4(self.path_to_bin, bin_name, level,
+                                                               self.matlab_parallel_flag, nargout=1)
+        if level == 2:
+            column_names = ALL_FTR_V4_COLUMN_NAMES
+        elif level == 1:
+            column_names = SLIM_FTR_V4_COLUMN_NAMES
+        elif level == 0:
+            column_names = BLOB_FTR_V4_COLUMN_NAMES
+        features = pd.DataFrame(np.array(features._data).reshape(features.size[::-1]).T, columns=column_names)
         features = features.astype({'ImageId': 'uint32', 'Area': 'uint64', 'NumberBlobsInImage': 'uint16'})
         features.set_index('ImageId', inplace=True)
         return features
@@ -174,8 +257,10 @@ class BinExtractor:
         # Read EcoTaxa file(s)
         if os.path.isfile(path_to_ecotaxa_tsv):
             self.classification_data = pd.read_csv(path_to_ecotaxa_tsv, header=0, sep='\t', engine='c',
-                                                   usecols=['object_id', 'object_annotation_status', 'object_annotation_hierarchy'],
-                                                   dtype={'object_id': str, 'object_annotation_status': 'category', 'object_annotation_hierarchy': 'category'})
+                                                   usecols=['object_id', 'object_annotation_status',
+                                                            'object_annotation_hierarchy'],
+                                                   dtype={'object_id': str, 'object_annotation_status': 'category',
+                                                          'object_annotation_hierarchy': 'category'})
         elif os.path.isdir(path_to_ecotaxa_tsv):
             list_tsv = glob.glob(os.path.join(path_to_ecotaxa_tsv, '**', '*.tsv'))
             # Read each tsv file
@@ -207,8 +292,10 @@ class BinExtractor:
         # Rename/Group categories
         taxon = pd.Series(taxonomic_grouping.taxon.values, index=taxonomic_grouping.hierarchy).to_dict()
         group = pd.Series(taxonomic_grouping.group.values, index=taxonomic_grouping.hierarchy).to_dict()
-        self.classification_data['Taxon'] = self.classification_data.Hierarchy.apply(lambda x: taxon[x]).astype('category')
-        self.classification_data['Group'] = self.classification_data.Hierarchy.apply(lambda x: group[x]).astype('category')
+        self.classification_data['Taxon'] = self.classification_data.Hierarchy.apply(lambda x: taxon[x]).astype(
+            'category')
+        self.classification_data['Group'] = self.classification_data.Hierarchy.apply(lambda x: group[x]).astype(
+            'category')
         # self.classification_data['Taxon'] = self.classification_data.Hierarchy.cat.rename_categories(taxon)  # Non unique new categories so does not work
         # self.classification_data['Group'] = self.classification_data.Hierarchy.cat.rename_categories(group)
         # Drop hierarchy
@@ -246,10 +333,12 @@ class BinExtractor:
             raise ValueError('%s: Non unique bin names in environmental data.' % bin_name)
         return foo.drop(columns={'bin'})
 
-    def get_bin_data(self, bin_name, write_image=True, include_classification=True):
+    def get_bin_data(self, bin_name, write_images_to=None, with_scale_bar=False, scale_bar_resolution=3.4,
+                     include_classification=False, feature_level=1):
         # Extract cytometric data, features, clear environmental data, and classification for use in ecological studies
-        cytometric_data = self.extract_images_and_cytometry(bin_name, write_image=write_image)
-        features = self.extract_features_v4(bin_name)
+        cytometric_data = self.extract_images_and_cytometry(bin_name, write_images_to, with_scale_bar,
+                                                            scale_bar_resolution)
+        features = self.extract_features_v4(bin_name, level=feature_level)
         if len(features.index) != len(cytometric_data):
             raise ValueError('%s: Cytometric and features data frames have different sizes.' % bin_name)
         if include_classification:
@@ -261,7 +350,7 @@ class BinExtractor:
                     print('%s: No classification data.' % bin_name)
                 else:
                     raise ValueError('Classification data incomplete: %d/%d' %
-                          (len(classification_data.index), len(cytometric_data)))
+                                     (len(classification_data.index), len(cytometric_data)))
             data = pd.concat([features, cytometric_data, classification_data], axis=1)
         else:
             data = pd.concat([features, cytometric_data], axis=1)
@@ -272,45 +361,97 @@ class BinExtractor:
          to prepare a dataset for machine learning training """
         print('Mode not implemented.')
 
-    def run_ml_classify_rt(self, bin_name):
+    def run_ml_classify_rt(self, bin_name, output_path):
         """  Extract png, cytometry, features, and obfuscated environmental data
          to classify oceanic plankton images with machine learning algorithms """
         # Write png and get cytometry and features
-        data = self.get_bin_data(bin_name, write_image=True, include_classification=False)
+        data = self.get_bin_data(bin_name, write_images_to=output_path)
         # Get environmental data
         environmental_data = self.query_environmental_data(bin_name)
         environmental_data = pd.DataFrame(np.repeat(environmental_data.values, len(data.index), axis=0),
-                                          columns=environmental_data.columns)
+                                          index=data.index, columns=environmental_data.columns)
         # Write data for machine learning
         data = pd.concat([data, environmental_data], axis=1)
-        data.to_csv(os.path.join(self.path_to_output, bin_name, bin_name + '_ml.csv'),
-                    index=False, na_rep='NaN', float_format='%.4f')
+        data.to_csv(os.path.join(output_path, bin_name, bin_name + '_ml.csv'),
+                    index=False, na_rep='NaN', float_format='%.4f', date_format='%Y/%m/%d %H:%M:%S')
 
-    def run_ml_classify_batch(self):
+    def run_ml_classify_batch(self, output_path):
         """ Run run_ml_classify_rt on list of bins loaded in environmental_data """
         for i in tqdm(range(len(self.environmental_data.index))):
             try:
                 if not os.path.isfile(os.path.join(self.path_to_bin, self.environmental_data['bin'][i] + '.roi')):
                     print('%s: missing roi file.' % self.environmental_data['bin'][i])
                     continue
-                if os.path.exists(os.path.join(self.path_to_output, self.environmental_data['bin'][i])):
+                if os.path.exists(os.path.join(output_path, self.environmental_data['bin'][i])):
                     print('%s: skipped' % self.environmental_data['bin'][i])
                     continue
-                self.run_ml_classify_rt(self.environmental_data['bin'][i])
+                self.run_ml_classify_rt(self.environmental_data['bin'][i], output_path)
             except:
                 print('%s: Caught Error' % self.environmental_data['bin'][i])
 
-    def run_ecotaxa(self):
-        """ Extract png with scale bar, cytometry, features, instrument configuration, environmental data,
-         and classfication (if available) for further validation with EcoTaxa """
-        print('Mode not implemented.')
+    def run_ecotaxa(self, output_path: str, bin_list: list = None,
+                    acquisition: dict = {}, process: dict = {}, url: str = ''):
+        """
+        Extract png with scale bar, cytometry, features, instrument configuration, environmental data
+        for further validation with EcoTaxa.
 
-    def run_ecology(self, bin_list=None, update_all=False, update_classification=False):
+        """
+        if acquisition:
+            for key in ['id', 'instrument', 'serial_number', 'resolution_pixel_per_micron']:
+                if key not in acquisition.keys():
+                    raise ValueError(f'acquisition is missing key: {key}')
+        if process:
+            for key in ['id', 'software']:
+                if key not in process.keys():
+                    raise ValueError(f'process is missing key: {key}')
+        # Files to process
+        if not bin_list:
+            bin_list = self.environmental_data['bin'].to_list()
+        for bin_name in tqdm(bin_list):
+            # Write images, read cytometry, and compute features
+            data = self.get_bin_data(bin_name, write_images_to=output_path, with_scale_bar=True,
+                                     scale_bar_resolution=acquisition['resolution_pixel_per_micron'],
+                                     feature_level=2)
+            # Get environmental data
+            env = self.query_environmental_data(bin_name)
+            # Comply with EcoTaxa TSV requirements
+            object_id = bin_name + '_' + data.index.astype('str').str.zfill(5)
+            et = pd.DataFrame({'img_file_id': object_id + '.png', 'object_id': object_id}, index=data.index)
+            # Object
+            if url:
+                et['object_link'] = f'{url}&bin={bin_name}'
+            et['object_lat'] = env.Latitude.values[0] if not env.Latitude.isna().any() else 44.9012018
+            et['object_lon'] = env.Longitude.values[0] if not env.Latitude.isna().any() else -68.6704788
+            et['object_date'] = env.DateTime.dt.strftime('%Y%m%d').values[0]
+            et['object_time'] = env.DateTime.dt.strftime('%H%M%S').values[0]
+            et['object_depth_min'] = env.Depth.values[0]
+            et['object_depth_max'] = env.Depth.values[0]
+            # Append all features and cytometry to Object
+            cols = et.columns.to_list()
+            et = pd.concat([et, data], axis=1)
+            et.columns = cols + ['object_' + upper_to_under(k) for k in data.columns]
+            # Sample
+            et['sample_id'] = bin_name
+            for k in env.columns:
+                if k not in ['DateTime', 'Latitude', 'Longitude', 'Depth']:
+                    et['sample_' + upper_to_under(k)] = env[k].astype(str).values[0]
+            # Acquisition
+            for k, v in acquisition.items():
+                et['acq_' + upper_to_under(k)] = str(v)
+            # Process
+            for k, v in process.items():
+                et['process_' + upper_to_under(k)] = str(v)
+            # Write tsv (with line indicating type)
+            et.columns = pd.MultiIndex.from_tuples([(c, '[t]' if et[c].dtype == 'O' else '[f]') for c in et.columns])
+            et.to_csv(os.path.join(output_path, bin_name, 'ecotaxa_' + bin_name + '.tsv'),
+                      index=False, na_rep='NaN', float_format='%.4f', sep='\t')
+
+    def run_ecology(self, output_path, bin_list=None, update_all=False, update_classification=False):
         """ Generate a file per bin with cytometry, features, and classification data
             Generate a metadata file with all environmental data and bin header information
             Intended for use in ecological studies """
         # Load previous metadata or create new one
-        metadata_filename = os.path.join(self.path_to_output, 'metadata.csv')
+        metadata_filename = os.path.join(output_path, 'metadata.csv')
         if os.path.isfile(metadata_filename):
             new_metadata_file = True
         else:
@@ -334,13 +475,13 @@ class BinExtractor:
                     print('%s: missing roi file.' % bin_name)
                     metadata.drop(index=i, inplace=True)
                     continue
-                bin_filename = os.path.join(self.path_to_output, bin_name + '_sci.csv')
+                bin_filename = os.path.join(output_path, bin_name + '_sci.csv')
                 if new_metadata_file or update_all or not os.path.isfile(bin_filename):
                     # Get header information
                     metadata.loc[i, HDR_COLUMN_NAMES] = self.extract_header(bin_name).values[0]
                 if not os.path.isfile(bin_filename) or update_all:
                     # Get cytometry, features, and classification and write to <bin_name>_sci.csv
-                    data = self.get_bin_data(bin_name, write_image=False, include_classification=True)
+                    data = self.get_bin_data(bin_name, include_classification=True)
                     data.to_csv(bin_filename,
                                 na_rep='NaN', float_format='%.4f', index_label='ImageId')
                     # Get percent validated
@@ -375,18 +516,20 @@ class BinExtractor:
                     # print('%s: skipped' % bin_name)
                     continue
             except Exception as e:
+                # raise e
                 print('%s: Caught Error: %s' % (bin_name, e))
         # Write metadata
         metadata['TriggerSelection'] = metadata['TriggerSelection'].astype('int64')
         metadata.rename(columns={'bin': 'BinId'}).to_csv(metadata_filename,
-                        index=False, na_rep='NaN', float_format='%.4f')
+                                                         index=False, na_rep='NaN', float_format='%.4f',
+                                                         date_format='%Y/%m/%d %H:%M:%S')
 
-    def check_ml_classify_batch(self):
+    def check_ml_classify_batch(self, path_to_data):
         flag = False
         # Get list of bins from 3 sources
         list_bins_env = list(self.environmental_data['bin'])
         list_bins_in = [b[0:-4] for b in os.listdir(self.path_to_bin) if b[-4:] == '.roi']
-        list_bins_out = os.listdir(self.path_to_output)
+        list_bins_out = os.listdir(path_to_data)
 
         # Check no bins are missing
         if len(list_bins_env) != len(set(list_bins_env)):
@@ -412,15 +555,15 @@ class BinExtractor:
         # Check that each bin is complete
         n = 0
         for b in tqdm(list_bins_out):
-            path_to_metadata = os.path.join(self.path_to_output, b, b + '_ml.csv')
+            path_to_metadata = os.path.join(path_to_data, b, b + '_ml.csv')
             if not os.path.exists(path_to_metadata):
                 flag = True
                 print('check_ml_classify_batch: %s no metadata file.' % b)
                 continue
             meta = pd.read_csv(path_to_metadata, header=0, engine='c')
             bin_name_parts = b.split('_')
-            list_images_from_meta = ['%s%sP%05d.png' % (bin_name_parts[1], bin_name_parts[0], i) for i in meta['ImageId']]
-            list_images_in_folder = [img for img in os.listdir(os.path.join(self.path_to_output, b)) if img[-4:] == '.png']
+            list_images_from_meta = [f'{b}_{i:05d}.png' for i in meta['ImageId']]
+            list_images_in_folder = [img for img in os.listdir(os.path.join(path_to_data, b)) if img[-4:] == '.png']
 
             missing_images_from_folder = np.setdiff1d(list_images_in_folder, list_images_from_meta)
             if missing_images_from_folder.size > 0:
@@ -443,13 +586,13 @@ class BinExtractor:
         if not flag:
             print('check_ml_classify_batch: Pass')
 
-        print('%d images checked in %d bins' % (n,len(list_bins_out)))
+        print('%d images checked in %d bins' % (n, len(list_bins_out)))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('mode', type=str, help="Set data extraction mode."
-                        " Options available are: ml-train, ml-classify-batch, ml-classify-rt, ecotaxa, ecology.")
+                                               " Options available are: ml-train, ml-classify-batch, ml-classify-rt, ecotaxa, ecology.")
     parser.add_argument('-r', '--raw', type=str, required=True,
                         help="Set path to raw IFCB directory (adc, hdr, and roi files).")
     parser.add_argument('-m', '--environmental', type=str, required=True,
@@ -472,7 +615,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Initialize extractor based on running mode
-    extractor = BinExtractor(args.raw, args.output, args.environmental, matlab_parallel_flag=args.parallel)
+    extractor = BinExtractor(args.raw, args.environmental, matlab_parallel_flag=args.parallel)
     if 'ml' not in args.mode:
         if not args.ecotaxa:
             print('argument -e, --ecotaxa required')
@@ -484,18 +627,18 @@ if __name__ == '__main__':
 
     # Run extractor
     if args.mode == 'ml-train':
-        extractor.run_ml_train()
+        extractor.run_ml_train(args.output)
     elif args.mode == 'ml-classify-batch':
-        extractor.run_ml_classify_batch()
-        extractor.check_ml_classify_batch()
+        extractor.run_ml_classify_batch(args.output)
+        extractor.check_ml_classify_batch(args.output)
     elif args.mode == 'ml-classify-rt':
         if not args.sample:
             print('argument -s, --sample required')
             sys.exit(-1)
-        extractor.run_ml_classify_rt(args.sample)
+        extractor.run_ml_classify_rt(args.sample, args.output)
     elif args.mode == 'ecotaxa':
-        extractor.run_ecotaxa(update_all=args.force, update_classification=args.update_classification)
+        extractor.run_ecotaxa(args.output)
     elif args.mode == 'ecology':
-        extractor.run_ecology()
+        extractor.run_ecology(args.output, update_all=args.force, update_classification=args.update_classification)
     else:
         print('mode not supported.')
