@@ -11,7 +11,7 @@ IFCB Tools provide tools to extract raw IFCB data to matlab files and incorporat
 ## Installation
 Install python dependencies
 
-    pip install pandas numpy PIL beautifulsoup4 imageio matlab
+    pip install pandas numpy PIL beautifulsoup4 imageio matlab openpyxl
 
 Install matlab Engine API for python (https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html)
     
