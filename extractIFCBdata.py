@@ -23,7 +23,7 @@ import sys
 import re
 
 
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 
 
 ADC_COLUMN_NAMES = ['TriggerId', 'ADCTime', 'SSCIntegrated', 'FLIntegrated', 'PMTC', 'PMTD', 'SSCPeak', 'FLPeak',
@@ -91,6 +91,14 @@ PATH_TO_MATLAB_FUNCTIONS = os.path.join(os.path.dirname(os.path.abspath(__file__
 IFCB_FLOW_RATE = 0.25
 
 
+class IFCBTools(Exception):
+    pass
+
+
+class CorruptedBin(IFCBTools):
+    pass
+
+
 def upper_to_under(var):
     """
     Insert underscore before upper case letter followed by lower case letter and lower case all sentence.
@@ -140,13 +148,15 @@ class BinExtractor:
         # Get Number of ROI within one trigger
         adc['NumberImagesInTrigger'] = [sum(adc['TriggerId'] == x) for x in adc['TriggerId']]
         rows_to_remove = list()
-        if write_images_to is not None:
+        if write_images_to is not None and not adc.empty:
             # Set path
             if not os.path.exists(write_images_to):
                 os.makedirs(write_images_to)
             path_to_png = os.path.join(write_images_to, bin_name)
             # Open ROI File
             roi = np.fromfile(os.path.join(self.path_to_bin, bin_name + '.roi'), 'uint8')
+            if len(roi) != adc['EndByte'].iloc[-1]:
+                raise CorruptedBin(f'CorruptedBin:{bin_name}: adc end byte is greater than roi size.')
             if not os.path.isdir(path_to_png):
                 os.mkdir(path_to_png)
             for d in adc.itertuples():
@@ -365,7 +375,11 @@ class BinExtractor:
         """  Extract png, cytometry, features, and obfuscated environmental data
          to classify oceanic plankton images with machine learning algorithms """
         # Write png and get cytometry and features
-        data = self.get_bin_data(bin_name, write_images_to=output_path)
+        try:
+            data = self.get_bin_data(bin_name, write_images_to=output_path)
+        except CorruptedBin as e:
+            print(e)
+            return
         # Get environmental data
         environmental_data = self.query_environmental_data(bin_name)
         environmental_data = pd.DataFrame(np.repeat(environmental_data.values, len(data.index), axis=0),
@@ -390,7 +404,7 @@ class BinExtractor:
                 print('%s: Caught Error' % self.environmental_data['bin'][i])
 
     def run_ecotaxa(self, output_path: str, bin_list: list = None,
-                    acquisition: dict = {}, process: dict = {}, url: str = ''):
+                    acquisition: dict = {}, process: dict = {}, url: str = '', update_all: bool = False):
         """
         Extract png with scale bar, cytometry, features, instrument configuration, environmental data
         for further validation with EcoTaxa.
@@ -408,15 +422,26 @@ class BinExtractor:
         if not bin_list:
             bin_list = self.environmental_data['bin'].to_list()
         for bin_name in tqdm(bin_list):
+            # Skip if already processed
+            if os.path.exists(os.path.join(output_path, bin_name)) and not update_all:
+                print(f'OutputExists:{bin_name}: Skipped')
+                continue
             # Write images, read cytometry, and compute features
-            data = self.get_bin_data(bin_name, write_images_to=output_path, with_scale_bar=True,
-                                     scale_bar_resolution=acquisition['resolution_pixel_per_micron'],
-                                     feature_level=2)
+            try:
+                data = self.get_bin_data(bin_name, write_images_to=output_path, with_scale_bar=True,
+                                         scale_bar_resolution=acquisition['resolution_pixel_per_micron'],
+                                         feature_level=2)
+            except CorruptedBin as e:
+                print(e)
+                continue
+            if data.empty:
+                print(f'EmptyBin:{bin_name}: Skipped')
+                continue
             # Get environmental data
             env = self.query_environmental_data(bin_name)
             # Comply with EcoTaxa TSV requirements
             object_id = bin_name + '_' + data.index.astype('str').str.zfill(5)
-            et = pd.DataFrame({'img_file_id': object_id + '.png', 'object_id': object_id}, index=data.index)
+            et = pd.DataFrame({'img_file_name': object_id + '.png', 'object_id': object_id}, index=data.index)
             # Object
             if url:
                 et['object_link'] = f'{url}&bin={bin_name}'
@@ -481,7 +506,11 @@ class BinExtractor:
                     metadata.loc[i, HDR_COLUMN_NAMES] = self.extract_header(bin_name).values[0]
                 if not os.path.isfile(bin_filename) or update_all:
                     # Get cytometry, features, and classification and write to <bin_name>_sci.csv
-                    data = self.get_bin_data(bin_name, include_classification=True)
+                    try:
+                        data = self.get_bin_data(bin_name, include_classification=True)
+                    except CorruptedBin as e:
+                        print(e)
+                        continue
                     data.to_csv(bin_filename,
                                 na_rep='NaN', float_format='%.4f', index_label='ImageId')
                     # Get percent validated
