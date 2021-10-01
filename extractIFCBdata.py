@@ -23,7 +23,7 @@ import sys
 import re
 
 
-__version__ = '0.2.1'
+__version__ = '0.2.3'
 
 
 ADC_COLUMN_NAMES = ['TriggerId', 'ADCTime', 'SSCIntegrated', 'FLIntegrated', 'PMTC', 'PMTD', 'SSCPeak', 'FLPeak',
@@ -199,12 +199,12 @@ class BinExtractor:
         look_time = float(hdr['runTime']) - float(hdr['inhibitTime'])  # seconds
         volume_sampled = IFCB_FLOW_RATE * look_time / 60
         # Format in Panda DataFrame
-        hdr = pd.DataFrame([[volume_sampled, float(hdr['SyringeSampleVolume']),
-                             int(hdr['PMTtriggerSelection_DAQ_MCConly']),
-                             float(hdr['PMTAhighVoltage']), float(hdr['PMTBhighVoltage']),
-                             float(hdr['PMTAtriggerThreshold_DAQ_MCConly']),
-                             float(hdr['PMTBtriggerThreshold_DAQ_MCConly'])]],
-                           columns=HDR_COLUMN_NAMES)
+        hdr = pd.Series([volume_sampled, float(hdr['SyringeSampleVolume']),
+                         int(hdr['PMTtriggerSelection_DAQ_MCConly']),
+                         float(hdr['PMTAhighVoltage']), float(hdr['PMTBhighVoltage']),
+                         float(hdr['PMTAtriggerThreshold_DAQ_MCConly']),
+                         float(hdr['PMTBtriggerThreshold_DAQ_MCConly'])],
+                        index=HDR_COLUMN_NAMES)
         return hdr
 
     def extract_features_v2(self, bin_name, minimal_feature_flag=False):
@@ -404,70 +404,107 @@ class BinExtractor:
                 print('%s: Caught Error' % self.environmental_data['bin'][i])
 
     def run_ecotaxa(self, output_path: str, bin_list: list = None,
-                    acquisition: dict = {}, process: dict = {}, url: str = '', update_all: bool = False):
+                    acquisition: dict = {}, process: dict = {}, url: str = '',
+                    force: bool = False, update: list = []):
         """
         Extract png with scale bar, cytometry, features, instrument configuration, environmental data
         for further validation with EcoTaxa.
 
         """
         if acquisition:
-            for key in ['id', 'instrument', 'serial_number', 'resolution_pixel_per_micron']:
+            for key in ['instrument', 'serial_number', 'resolution_pixel_per_micron']:
                 if key not in acquisition.keys():
                     raise ValueError(f'acquisition is missing key: {key}')
         if process:
             for key in ['id', 'software']:
                 if key not in process.keys():
                     raise ValueError(f'process is missing key: {key}')
+        # Setup logic of parts to update
+        from_raw = True if not update else False
+        set_env = True if not update or 'environment' in update else False
+        set_acq = True if not update or 'acquisition' in update else False
+        set_proc = True if not update or 'process' in update else False
         # Files to process
         if not bin_list:
             bin_list = self.environmental_data['bin'].to_list()
         for bin_name in tqdm(bin_list):
             # Skip if already processed
-            if os.path.exists(os.path.join(output_path, bin_name)) and not update_all:
+            if os.path.exists(os.path.join(output_path, bin_name)) and not force:
                 print(f'OutputExists:{bin_name}: Skipped')
                 continue
-            # Write images, read cytometry, and compute features
-            try:
-                data = self.get_bin_data(bin_name, write_images_to=output_path, with_scale_bar=True,
-                                         scale_bar_resolution=acquisition['resolution_pixel_per_micron'],
-                                         feature_level=2)
-            except CorruptedBin as e:
-                print(e)
-                continue
-            if data.empty:
-                print(f'EmptyBin:{bin_name}: Skipped')
-                continue
-            # Get environmental data
-            env = self.query_environmental_data(bin_name)
-            # Comply with EcoTaxa TSV requirements
-            object_id = bin_name + '_' + data.index.astype('str').str.zfill(5)
-            et = pd.DataFrame({'img_file_name': object_id + '.png', 'object_id': object_id}, index=data.index)
-            # Object
-            if url:
-                et['object_link'] = f'{url}&bin={bin_name}'
-            et['object_lat'] = env.Latitude.values[0] if not env.Latitude.isna().any() else 44.9012018
-            et['object_lon'] = env.Longitude.values[0] if not env.Latitude.isna().any() else -68.6704788
-            et['object_date'] = env.DateTime.dt.strftime('%Y%m%d').values[0]
-            et['object_time'] = env.DateTime.dt.strftime('%H%M%S').values[0]
-            et['object_depth_min'] = env.Depth.values[0]
-            et['object_depth_max'] = env.Depth.values[0]
-            # Append all features and cytometry to Object
-            cols = et.columns.to_list()
-            et = pd.concat([et, data], axis=1)
-            et.columns = cols + ['object_' + upper_to_under(k) for k in data.columns]
+            if from_raw:
+                # Write images, read cytometry, and compute features
+                try:
+                    data = self.get_bin_data(bin_name, write_images_to=output_path, with_scale_bar=True,
+                                             scale_bar_resolution=acquisition['resolution_pixel_per_micron'],
+                                             feature_level=2)
+                except CorruptedBin as e:
+                    print(e)
+                    continue
+                if data.empty:
+                    print(f'EmptyBin:{bin_name}: Skipped')
+                    continue
+                # Create DataFrame for EcoTaxa
+                object_id = bin_name + '_' + data.index.astype('str').str.zfill(5)
+                et = pd.DataFrame({'img_file_name': object_id + '.png', 'object_id': object_id}, index=data.index)
+            else:
+                if not os.path.exists(os.path.join(output_path, bin_name, 'ecotaxa_' + bin_name + '.tsv')):
+                    print(f'MissingBin:{bin_name}: Skipped')
+                    continue
+                # Read already computed features and cytometry; skip image extraction
+                et = pd.read_csv(os.path.join(output_path, bin_name, 'ecotaxa_' + bin_name + '.tsv'),
+                                 header=[0, 1], delimiter='\t', dtype={'object_date': str, 'object_time': str})
+            if set_env:
+                # Get environmental data
+                env = self.query_environmental_data(bin_name)
+                # Object
+                if url:
+                    et['object_link'] = f'{url}&bin={bin_name}'
+                et['object_lat'] = env.Latitude.values[0] if not env.Latitude.isna().any() else 44.9012018
+                et['object_lon'] = env.Longitude.values[0] if not env.Latitude.isna().any() else -68.6704788
+                et['object_date'] = env.DateTime.dt.strftime('%Y%m%d').values[0]
+                et['object_time'] = env.DateTime.dt.strftime('%H%M%S').values[0]
+                et['object_depth_min'] = env.Depth.values[0]
+                et['object_depth_max'] = env.Depth.values[0]
+            if from_raw:
+                # Append all features and cytometry to Object
+                # Done here to add columns in order
+                cols = et.columns.to_list()
+                et = pd.concat([et, data], axis=1)
+                et.columns = cols + ['object_' + upper_to_under(k) for k in data.columns]
             # Sample
-            et['sample_id'] = bin_name
-            for k in env.columns:
-                if k not in ['DateTime', 'Latitude', 'Longitude', 'Depth']:
-                    et['sample_' + upper_to_under(k)] = env[k].astype(str).values[0]
+            if set_env:
+                et['sample_id'] = bin_name
+                for k in env.columns:
+                    if k not in ['DateTime', 'Latitude', 'Longitude', 'Depth']:
+                        et['sample_' + upper_to_under(k)] = env[k].astype(str).values[0]
             # Acquisition
-            for k, v in acquisition.items():
-                et['acq_' + upper_to_under(k)] = str(v)
+            if set_acq:
+                et['acq_id'] = acquisition['instrument'] + str(acquisition['serial_number']) + '.' + bin_name
+                # User Input
+                for k, v in acquisition.items():
+                    et['acq_' + upper_to_under(k)] = str(v)
+                # Bin Header (e.g. volume sampled, pmt settings)
+                hdr = self.extract_header(bin_name)
+                for k, v in hdr.items():
+                    et['acq_' + upper_to_under(k)] = v
             # Process
-            for k, v in process.items():
-                et['process_' + upper_to_under(k)] = str(v)
+            if set_proc:
+                for k, v in process.items():
+                    et['process_' + upper_to_under(k)] = str(v)
             # Write tsv (with line indicating type)
-            et.columns = pd.MultiIndex.from_tuples([(c, '[t]' if et[c].dtype == 'O' else '[f]') for c in et.columns])
+            if from_raw:
+                cols = [(c, '[t]' if et[c].dtype == 'O' else '[f]') for c in et.columns]
+            else:
+                # Already multi-index, assign type only to unknown cols
+                cols = []
+                for c in et.columns:
+                    if not c[1]:
+                        cols.append((c[0], '[t]' if et[c[0]].dtype == 'O' else '[f]'))
+                    else:
+                        cols.append(c)
+                # et[('object_time', '[t]')] = et[('object_time', '[t]')].apply(lambda r: f'{r:06d}')  # Patch object time
+            et.columns = pd.MultiIndex.from_tuples(cols)
             et.to_csv(os.path.join(output_path, bin_name, 'ecotaxa_' + bin_name + '.tsv'),
                       index=False, na_rep='NaN', float_format='%.4f', sep='\t')
 
@@ -503,7 +540,7 @@ class BinExtractor:
                 bin_filename = os.path.join(output_path, bin_name + '_sci.csv')
                 if new_metadata_file or update_all or not os.path.isfile(bin_filename):
                     # Get header information
-                    metadata.loc[i, HDR_COLUMN_NAMES] = self.extract_header(bin_name).values[0]
+                    metadata.loc[i, HDR_COLUMN_NAMES] = self.extract_header(bin_name)
                 if not os.path.isfile(bin_filename) or update_all:
                     # Get cytometry, features, and classification and write to <bin_name>_sci.csv
                     try:
