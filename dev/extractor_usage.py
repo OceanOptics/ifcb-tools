@@ -19,7 +19,7 @@ output_path = '/Users/nils/Data/NAAMES/IFCB/Products'
 # matlab_engine.parpool()
 ifcb = BinExtractor(path_to_bin, output_path, path_to_env_csv, path_to_ecotaxa_dir, path_to_taxonomic_grouping_csv,
                     matlab_parallel_flag=True) # , matlab_engine=matlab_engine)
-ifcb.run_ecology()
+ifcb.run_science()
 
 # Run BinExtractor to build scientific dataset EXPORTS
 path_to_bin = '/Users/nils/Data/EXPORTS/IFCB107/raw'
@@ -32,7 +32,7 @@ output_path = '/Users/nils/Data/EXPORTS/IFCB107/SCI_20191115'
 # matlab_engine.parpool()
 ifcb = BinExtractor(path_to_bin, output_path, path_to_env_csv, path_to_ecotaxa_dir, path_to_taxonomic_grouping_csv,
                     matlab_parallel_flag=True)#, matlab_engine=matlab_engine)
-ifcb.run_ecology(update_classification=True)
+ifcb.run_science(update_classification=True)
 # ifcb.run_ecology(bin_list_to_reprocess, update_classification=True)
 
 # Run BinExtractor to build scientific dataset of NAAMES BEADS
@@ -45,7 +45,7 @@ output_path = '/Users/nils/Data/NAAMES/IFCB/Calibration/BEADS_SCI_20191122'
 # matlab_engine.parpool()
 ifcb = BinExtractor(path_to_bin, output_path, path_to_env_csv, path_to_ecotaxa_dir, path_to_taxonomic_grouping_csv,
                     matlab_parallel_flag=True)#, matlab_engine=matlab_engine)
-ifcb.run_ecology()
+ifcb.run_science()
 
 # Run BinExtractor to build scientific dataset of BEADS April 2019
 path_to_bin = '/Users/nils/Data/IFCB_SizeCalibration/raw'
@@ -57,7 +57,7 @@ output_path = '/Users/nils/Data/IFCB_SizeCalibration/BEADS201904_SCI_20191125'
 # matlab_engine.parpool()
 ifcb = BinExtractor(path_to_bin, output_path, path_to_env_csv, path_to_ecotaxa_dir, path_to_taxonomic_grouping_csv,
                     matlab_parallel_flag=True)  # , matlab_engine=matlab_engine)
-ifcb.run_ecology()
+ifcb.run_science()
 
 # ./extractIFCBdata.py ecology -r /Users/nils/Data/IFCB_SizeCalibration/raw -m /Users/nils/Data/IFCB_SizeCalibration/BEADS201904_metadata.csv -t /Users/nils/Data/IFCB_SizeCalibration/beads_taxonomic_grouping.csv -e /Users/nils/Data/IFCB_SizeCalibration/ecotaxa/export/ecotaxa_export_2563_20191125_1920.tsv -o test -p
 
@@ -76,8 +76,8 @@ env_csv = '/Users/nils/Data/MachineLearning/KaggleDataset/NAAMESEnvironmentalDat
 matlab_engine = matlab.engine.start_matlab()
 matlab_engine.parpool()
 ifcb = BinExtractor(input_path, output_path, env_csv, matlab_engine=matlab_engine, matlab_parallel_flag=True)
-ifcb.run_ml_classify_batch()
-ifcb.check_ml_classify_batch()
+ifcb.run_machine_learning()
+ifcb.check_machine_learning()
 # check_ml_classify_batch: Missing 8 bins from raw folder:
 # D20170514T115029_IFCB107
 # D20170519T041154_IFCB107

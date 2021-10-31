@@ -1,29 +1,30 @@
+function make_ifcb_table(info, cfg)
 % Make a wonderful table of IFCB samples including:
 %   + all NAAMES data
 %   + calibrated features (pixel to um)
 %   + reliable samples (flag and trigger selection)
 
-addpath helpers/ ../utils/ProgressBar/
+%addpath helpers/ ../utils/ProgressBar/
 
 %% Configuration
 % NAAMES
-% info.PROJECT_NAME = 'NAAMES';
-% info.ECOTAXA_EXPORT_DATE = '20191111';
-% info.IFCB_RESOLUTION = 2.7488;
-% info.CALIBRATED = true;
-% IGNORE_FLUSH_FLAG = false;  % true for cultures | false otherwise
-% info.REMOVED_CONCENTRATED_SAMPLES = true;
-% cfg.path_to_input_data = '/Users/nils/Data/NAAMES/IFCB/SCI_20191111/';
-% cfg.path_to_output_table = '/Users/nils/Data/NAAMES/IFCB/';
+%info.PROJECT_NAME = 'NAAMES';
+%info.ECOTAXA_EXPORT_DATE = '20211031';
+%info.IFCB_RESOLUTION = 2.7488;
+%info.CALIBRATED = true;
+%IGNORE_FLUSH_FLAG = false;  % true for cultures | false otherwise
+%info.REMOVED_CONCENTRATED_SAMPLES = true;
+%cfg.path_to_input_data = '/Users/nils/Data/NAAMES/IFCB/SCI_20191111/';
+%cfg.path_to_output_table = '/Users/nils/Data/NAAMES/IFCB/';
 % EXPORTS
-info.PROJECT_NAME = 'EXPORTS';
-info.ECOTAXA_EXPORT_DATE = '20191115';
-info.IFCB_RESOLUTION = 2.7488;
-info.CALIBRATED = true;
-IGNORE_FLUSH_FLAG = false;  % true for cultures | false otherwise
-info.REMOVED_CONCENTRATED_SAMPLES = false;
-cfg.path_to_input_data = '/Users/nils/Data/EXPORTS/IFCB107/SCI_20191115/';
-cfg.path_to_output_table = '/Users/nils/Data/EXPORTS/IFCB107/';
+%info.PROJECT_NAME = 'EXPORTS';
+%info.ECOTAXA_EXPORT_DATE = '20191115';
+%info.IFCB_RESOLUTION = 2.7488;
+%info.CALIBRATED = true;
+%%IGNORE_FLUSH_FLAG = false;  % true for cultures | false otherwise
+%info.REMOVED_CONCENTRATED_SAMPLES = false;
+%cfg.path_to_input_data = '/Users/nils/Data/EXPORTS/IFCB107/SCI_20191115/';
+%cfg.path_to_output_table = '/Users/nils/Data/EXPORTS/IFCB107/';
 % %% NAAMES BEADS
 % info.PROJECT_NAME = 'NAAMES_BEADS';
 % info.ECOTAXA_EXPORT_DATE = '20191122';
@@ -142,15 +143,15 @@ end
 %     - 2^10 Corrupted (good sample, bad file)
 fprintf('Removing flagged data ... ');
 flags = arrayfun(@(x) find(bitget(x, 1:11))-1, ifcb.Flag, 'UniformOutput', false);
-if IGNORE_FLUSH_FLAG
-  fail = cellfun(@(y) any(y == 1 | y == 2 | y == 3 | y == 7 | y == 8 | y == 10), flags);
-  ifcb(fail,:) = [];
-  info.FLAGS_TO_REMOVE = [1 2 3 7 8 10];
-else
-  fail = cellfun(@(y) any(y == 1 | y == 2 | y == 3 | y == 5 | y == 7 | y == 8 | y == 10), flags);
-  ifcb(fail,:) = [];
-  info.FLAGS_TO_REMOVE = [1 2 3 5 7 8 10];
-end
+%if IGNORE_FLUSH_FLAG
+%  fail = cellfun(@(y) any(y == 1 | y == 2 | y == 3 | y == 7 | y == 8 | y == 10), flags);
+%  ifcb(fail,:) = [];
+%  info.FLAGS_TO_REMOVE = [1 2 3 7 8 10];
+%else
+fail = cellfun(@(y) any(y == 1 | y == 2 | y == 3 | y == 5 | y == 7 | y == 8 | y == 10), flags);
+ifcb(fail,:) = [];
+info.FLAGS_TO_REMOVE = [1 2 3 5 7 8 10];
+%end
 info.REMOVED_BINS_FLAGGED = ifcb.BinId(fail);
 fprintf('Done\n');
 
@@ -251,8 +252,10 @@ fprintf('Types left:\n'); for t=categories(ifcb.Type)'; fprintf('\t- %s\n', t{1}
 %     + extraction of data from raw files is done with python script IFCBDataExtractor.py
 %     + updated to features_v4 from Heidi's code (improved blob extraction)
 
-info.TABLE_VERSION = 14;
+%info.TABLE_VERSION = 14;
 info.CREATED = datestr(now(), 'yyyy/mm/dd HH:MM:SS');
 fprintf('Saving MATLAB table ... ');
 save([cfg.path_to_output_table filesep info.PROJECT_NAME '_IFCB_' info.ECOTAXA_EXPORT_DATE], 'ifcb', 'info');%, '-v7.3');
 fprintf('Done\n');
+
+end

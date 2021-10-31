@@ -8,7 +8,7 @@ Export IFCB data into different format depending on application requested:
 
 MIT License
 
-Copyright (c) 2020 Nils Haentjens
+Copyright (c) 2021 Nils Haentjens
 """
 
 import argparse
@@ -23,7 +23,7 @@ import sys
 import re
 
 
-__version__ = '0.2.3'
+__version__ = '0.3.0'
 
 
 ADC_COLUMN_NAMES = ['TriggerId', 'ADCTime', 'SSCIntegrated', 'FLIntegrated', 'PMTC', 'PMTD', 'SSCPeak', 'FLPeak',
@@ -275,7 +275,7 @@ class BinExtractor:
             list_tsv = glob.glob(os.path.join(path_to_ecotaxa_tsv, '**', '*.tsv'))
             # Read each tsv file
             data = [None] * len(list_tsv)
-            for i, f in enumerate(tqdm(list_tsv)):
+            for i, f in enumerate(tqdm(list_tsv, desc='Reading Ecotaxa Files')):
                 data[i] = pd.read_csv(f, header=0, sep='\t', engine='c',
                                       usecols=['object_id', 'object_annotation_status', 'object_annotation_hierarchy'],
                                       dtype={'object_id': str, 'object_annotation_status': 'category',
@@ -302,10 +302,10 @@ class BinExtractor:
         # Rename/Group categories
         taxon = pd.Series(taxonomic_grouping.taxon.values, index=taxonomic_grouping.hierarchy).to_dict()
         group = pd.Series(taxonomic_grouping.group.values, index=taxonomic_grouping.hierarchy).to_dict()
-        self.classification_data['Taxon'] = self.classification_data.Hierarchy.apply(lambda x: taxon[x]).astype(
-            'category')
-        self.classification_data['Group'] = self.classification_data.Hierarchy.apply(lambda x: group[x]).astype(
-            'category')
+        self.classification_data['Taxon'] = self.classification_data.Hierarchy\
+            .apply(lambda x: taxon[x] if x in taxon.keys() else x).astype('category')
+        self.classification_data['Group'] = self.classification_data.Hierarchy\
+            .apply(lambda x: group[x] if x in group.keys() else x).astype('category')
         # self.classification_data['Taxon'] = self.classification_data.Hierarchy.cat.rename_categories(taxon)  # Non unique new categories so does not work
         # self.classification_data['Group'] = self.classification_data.Hierarchy.cat.rename_categories(group)
         # Drop hierarchy
@@ -314,8 +314,7 @@ class BinExtractor:
         sel = self.classification_data['id'].str.len() != 30
         if np.any(sel):
             sel = np.where(sel)[0]
-            for i in sel:
-                print('%s: Incorrect identification number from EcoTaxa' % self.classification_data['id'][i])
+            print(f"Invalid id(s) in EcoTaxa file, dropping: {[self.classification_data['id'][i] for i in sel]}")
             self.classification_data.drop(index=sel, inplace=True)
         # Split EcoTaxa Id
         self.classification_data['bin'] = self.classification_data['id'].apply(lambda x: x[0:24]).astype('category')
@@ -371,7 +370,7 @@ class BinExtractor:
          to prepare a dataset for machine learning training """
         print('Mode not implemented.')
 
-    def run_ml_classify_rt(self, bin_name, output_path):
+    def run_machine_learning_single_bin(self, bin_name, output_path):
         """  Extract png, cytometry, features, and obfuscated environmental data
          to classify oceanic plankton images with machine learning algorithms """
         # Write png and get cytometry and features
@@ -389,7 +388,7 @@ class BinExtractor:
         data.to_csv(os.path.join(output_path, bin_name, bin_name + '_ml.csv'),
                     index=False, na_rep='NaN', float_format='%.4f', date_format='%Y/%m/%d %H:%M:%S')
 
-    def run_ml_classify_batch(self, output_path):
+    def run_machine_learning(self, output_path):
         """ Run run_ml_classify_rt on list of bins loaded in environmental_data """
         for i in tqdm(range(len(self.environmental_data.index))):
             try:
@@ -399,7 +398,7 @@ class BinExtractor:
                 if os.path.exists(os.path.join(output_path, self.environmental_data['bin'][i])):
                     print('%s: skipped' % self.environmental_data['bin'][i])
                     continue
-                self.run_ml_classify_rt(self.environmental_data['bin'][i], output_path)
+                self.run_machine_learning_single_bin(self.environmental_data['bin'][i], output_path)
             except:
                 print('%s: Caught Error' % self.environmental_data['bin'][i])
 
@@ -508,20 +507,29 @@ class BinExtractor:
             et.to_csv(os.path.join(output_path, bin_name, 'ecotaxa_' + bin_name + '.tsv'),
                       index=False, na_rep='NaN', float_format='%.4f', sep='\t')
 
-    def run_ecology(self, output_path, bin_list=None, update_all=False, update_classification=False):
-        """ Generate a file per bin with cytometry, features, and classification data
-            Generate a metadata file with all environmental data and bin header information
-            Intended for use in ecological studies """
+    def run_science(self, output_path, bin_list=None, update_all=False, update_classification=False,
+                    make_matlab_table=False, matlab_table_info=None):
+        """
+        Generate a file per bin with cytometry, features, and classification data
+        Generate a metadata file with all environmental data and bin header information
+        """
+        if make_matlab_table:
+            if not isinstance(matlab_table_info, dict):
+                raise ValueError('matlab_table_info is required and must be a dictionary')
+            for k in ['PROJECT_NAME', 'ECOTAXA_EXPORT_DATE', 'IFCB_RESOLUTION',
+                      'CALIBRATED', 'REMOVED_CONCENTRATED_SAMPLES']:
+                if k not in matlab_table_info.keys():
+                    raise ValueError(f'matlab_table_info must have field: {k}')
         # Load previous metadata or create new one
         metadata_filename = os.path.join(output_path, 'metadata.csv')
         if os.path.isfile(metadata_filename):
-            new_metadata_file = True
-        else:
             new_metadata_file = False
-        if new_metadata_file:
             metadata = pd.read_csv(metadata_filename)
             metadata.rename(columns={'BinId': 'bin'}, inplace=True)
+            if 'Validated' in metadata.columns:
+                metadata.rename(columns={'Validated': 'AnnotationValidated'}, inplace=True)
         else:
+            new_metadata_file = True
             metadata = self.environmental_data
             for c in HDR_COLUMN_NAMES:
                 metadata[c] = np.nan
@@ -540,7 +548,7 @@ class BinExtractor:
                 bin_filename = os.path.join(output_path, bin_name + '_sci.csv')
                 if new_metadata_file or update_all or not os.path.isfile(bin_filename):
                     # Get header information
-                    metadata.loc[i, HDR_COLUMN_NAMES] = self.extract_header(bin_name)
+                    metadata.loc[i, HDR_COLUMN_NAMES] = self.extract_header(bin_name).to_list()
                 if not os.path.isfile(bin_filename) or update_all:
                     # Get cytometry, features, and classification and write to <bin_name>_sci.csv
                     try:
@@ -562,6 +570,9 @@ class BinExtractor:
                         if foo.shape[0] != data.shape[0]:
                             print('%s: Unable to update classification, different sizes.' % bin_name)
                             continue
+                        # Rename old column Status to AnnotationStatus (for old NAAMES files)
+                        if 'Status' in foo.columns:
+                            foo.rename(columns={'Status': 'AnnotationStatus'}, inplace=True)
                         # Replace old columns by new ones
                         foo.drop(columns=data.columns, axis=0, inplace=True)
                         data = pd.concat([foo, data], axis=1)
@@ -585,12 +596,21 @@ class BinExtractor:
                 # raise e
                 print('%s: Caught Error: %s' % (bin_name, e))
         # Write metadata
-        metadata['TriggerSelection'] = metadata['TriggerSelection'].astype('int64')
+        metadata['TriggerSelection'] = metadata['TriggerSelection'].astype('int32')
         metadata.rename(columns={'bin': 'BinId'}).to_csv(metadata_filename,
                                                          index=False, na_rep='NaN', float_format='%.4f',
                                                          date_format='%Y/%m/%d %H:%M:%S')
+        # Make matlab table calling appropriate helper
+        if make_matlab_table:
+            if self.matlab_engine is None:
+                # Start Matlab engine and add IFCB_analysis
+                self.matlab_engine = matlab.engine.start_matlab()
 
-    def check_ml_classify_batch(self, path_to_data):
+            self.matlab_engine.addpath(PATH_TO_MATLAB_FUNCTIONS)
+            cfg = dict(path_to_input_data=output_path, path_to_output_table=output_path)
+            self.matlab_engine.make_ifcb_table(matlab_table_info, cfg, nargout=0)
+
+    def check_machine_learning(self, path_to_data):
         flag = False
         # Get list of bins from 3 sources
         list_bins_env = list(self.environmental_data['bin'])
@@ -695,16 +715,16 @@ if __name__ == '__main__':
     if args.mode == 'ml-train':
         extractor.run_ml_train(args.output)
     elif args.mode == 'ml-classify-batch':
-        extractor.run_ml_classify_batch(args.output)
-        extractor.check_ml_classify_batch(args.output)
+        extractor.run_machine_learning(args.output)
+        extractor.check_machine_learning(args.output)
     elif args.mode == 'ml-classify-rt':
         if not args.sample:
             print('argument -s, --sample required')
             sys.exit(-1)
-        extractor.run_ml_classify_rt(args.sample, args.output)
+        extractor.run_machine_learning_single_bin(args.sample, args.output)
     elif args.mode == 'ecotaxa':
         extractor.run_ecotaxa(args.output)
     elif args.mode == 'ecology':
-        extractor.run_ecology(args.output, update_all=args.force, update_classification=args.update_classification)
+        extractor.run_science(args.output, update_all=args.force, update_classification=args.update_classification)
     else:
         print('mode not supported.')
