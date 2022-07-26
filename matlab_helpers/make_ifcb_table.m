@@ -84,7 +84,10 @@ list = {'ImageX','ImageY','ImageWidth','ImageHeight'};
 for f=list; ifcb.Properties.VariableUnits{f{1}} = 'pixels'; end
 % no units
 list = {'ImageId','Eccentricity','Extent','Solidity','AnnotationStatus','Taxon','Group'};
-for f=list; ifcb.Properties.VariableUnits{f{1}} = 'no units'; end
+for f=list;
+    if ~ismember(f{1}, ifcb.Properties.VariableNames); continue; end
+    ifcb.Properties.VariableUnits{f{1}} = 'no units';
+end
 fprintf('Done\n');
 end
 
@@ -93,7 +96,11 @@ fprintf('Missing EcoTaxa samples in inline:\n');
 n = 0; m = 0; l = {};
 for i=find(ifcb.Type == 'inline')'
   if isnan(ifcb.AnnotationValidated(i)) && ~isempty(ifcb.BinId{i})
-    fprintf('N%d\t%s\n', ifcb.Campaign(i), ifcb.BinId{i})
+    if ismember('Campaign', ifcb.Properties.VariableNames)
+      fprintf('N%d\t%s\n', ifcb.Campaign(i), ifcb.BinId{i});
+    else
+      fprintf('%s\n', ifcb.BinId{i});
+    end
     n = n + length(ifcb.ImageId{i});
     m = m + 1;
     l{end+1} = ifcb.BinId{i};
@@ -113,7 +120,11 @@ fprintf('Missing EcoTaxa samples in niskin:\n');
 n = 0; m = 0; l = {};
 for i=find(ifcb.Type == 'niskin')'
   if isnan(ifcb.AnnotationValidated(i)) && ~isempty(ifcb.BinId{i})
-    fprintf('N%d\t%s\n', ifcb.Campaign(i), ifcb.BinId{i})
+    if ismember('Campaign', ifcb.Properties.VariableNames)
+      fprintf('N%d\t%s\n', ifcb.Campaign(i), ifcb.BinId{i});
+    else
+      fprintf('%s\n', ifcb.BinId{i});
+    end
     n = n + length(ifcb.ImageId{i});
     m = m + 1;
     l{end+1} = ifcb.BinId{i};

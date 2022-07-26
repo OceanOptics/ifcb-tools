@@ -21,15 +21,9 @@ from warnings import warn
 import pandas as pd
 from pandas.api.types import union_categoricals
 import numpy as np
-import os, glob
-from PIL import Image, ImageDraw, ImageFont
-import matlab.engine
-from tqdm import tqdm
-import sys
-import re
 
 
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 
 
 ADC_COLUMN_NAMES = ['TriggerId', 'ADCTime', 'SSCIntegrated', 'FLIntegrated', 'PMTC', 'PMTD', 'SSCPeak', 'FLPeak',
@@ -352,16 +346,14 @@ class BinExtractor:
         return foo.drop(columns={'bin'})
 
     def get_bin_data(self, bin_name, write_images_to=None, with_scale_bar=False, scale_bar_resolution=3.4,
-                     include_classification=False, feature_level=1):
+                     feature_level=1):
         # Extract cytometric data, features, clear environmental data, and classification for use in ecological studies
         cytometric_data = self.extract_images_and_cytometry(bin_name, write_images_to, with_scale_bar,
                                                             scale_bar_resolution)
         features = self.extract_features_v4(bin_name, level=feature_level)
         if len(features.index) != len(cytometric_data):
             raise ValueError('%s: Cytometric and features data frames have different sizes.' % bin_name)
-        if include_classification:
-            if self.classification_data is None:
-                raise ValueError("Classification data must be loaded first.")
+        if self.classification_data is not None:
             classification_data = self.query_classification(bin_name, verbose=False)
             if len(classification_data.index) != len(cytometric_data):
                 if classification_data.empty:
@@ -383,6 +375,8 @@ class BinExtractor:
         """  Extract png, cytometry, features, and obfuscated environmental data
          to classify oceanic plankton images with machine learning algorithms """
         # Write png and get cytometry and features
+        if self.classification_data is None:
+            raise ValueError("Classification data must be loaded first.")
         try:
             data = self.get_bin_data(bin_name, write_images_to=output_path)
         except CorruptedBin as e:
@@ -427,6 +421,8 @@ class BinExtractor:
             for key in ['id', 'software']:
                 if key not in process.keys():
                     raise ValueError(f'process is missing key: {key}')
+        if self.classification_data is None:
+            raise ValueError("Classification data must be loaded first.")
         # Setup logic of parts to update
         from_raw = True if not update else False
         set_env = True if not update or 'environment' in update else False
@@ -544,6 +540,9 @@ class BinExtractor:
                 metadata[c] = np.nan
             metadata['TriggerSelection'] = -9999
             metadata['AnnotationValidated'] = np.nan
+        # Check classification
+        if self.classification_data is None:
+            print('Warning: classification missing.')
         # Set list to parse
         if not bin_list:
             bin_list = metadata['bin']
@@ -561,17 +560,17 @@ class BinExtractor:
                 if not os.path.isfile(bin_filename) or update_all:
                     # Get cytometry, features, and classification and write to <bin_name>_sci.csv
                     try:
-                        data = self.get_bin_data(bin_name, include_classification=True)
+                        data = self.get_bin_data(bin_name)
                     except CorruptedBin as e:
                         print(e)
                         continue
                     data.to_csv(bin_filename,
                                 na_rep='NaN', float_format='%.4f', index_label='ImageId')
                     # Get percent validated
-                    if not data.empty:
+                    if not data.empty and 'AnnotationStatus' in data.keys():
                         metadata.loc[i, 'AnnotationValidated'] = np.sum(data['AnnotationStatus'] == 'validated') / len(
                             data.index)
-                elif update_classification:
+                elif update_classification and self.classification_data is not None:
                     # Get classification data to get validation percentage for metadata file
                     data = self.query_classification(bin_name, verbose=True)
                     if not data.empty:
@@ -590,7 +589,7 @@ class BinExtractor:
                         # Update percent validated in metadata
                         metadata.loc[i, 'AnnotationValidated'] = np.sum(data['AnnotationStatus'] == 'validated') / len(
                             data.index)
-                elif new_metadata_file:
+                elif new_metadata_file and self.classification_data is not None:
                     # Get classification data to get validation percentage for metadata file
                     data = self.query_classification(bin_name, verbose=True)
                     if not data.empty:

@@ -38,9 +38,12 @@ for i=progress(1:n, 'Title', 'Reading SCI')
   if ismember('Status', d.Properties.VariableNames)
     d.Properties.VariableNames{'Status'} = 'AnnotationStatus';
   end
-  d.AnnotationStatus = categorical(d.AnnotationStatus);
-  d.Taxon = categorical(d.Taxon);
-  d.Group = categorical(d.Group);
+  list = {'AnnotationStatus','Taxon','Group'};
+  for f=list; f = f{1};
+    if ismember(f, data.Properties.VariableNames)
+      d.(f) = categorical(d.AnnotationStatus);
+    end
+  end
   if ismember('Var1', data.Properties.VariableNames)
     error(['Unlabelled variable: ' data.BinId{i-1}]);
   end
