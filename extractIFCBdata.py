@@ -18,12 +18,15 @@ import re
 import argparse
 from warnings import warn
 
+import numpy as np
 import pandas as pd
 from pandas.api.types import union_categoricals
-import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+import matlab.engine
+from tqdm import tqdm
 
 
-__version__ = '0.3.1'
+__version__ = '0.3.2'
 
 
 ADC_COLUMN_NAMES = ['TriggerId', 'ADCTime', 'SSCIntegrated', 'FLIntegrated', 'PMTC', 'PMTD', 'SSCPeak', 'FLPeak',
@@ -421,8 +424,6 @@ class BinExtractor:
             for key in ['id', 'software']:
                 if key not in process.keys():
                     raise ValueError(f'process is missing key: {key}')
-        if self.classification_data is None:
-            raise ValueError("Classification data must be loaded first.")
         # Setup logic of parts to update
         from_raw = True if not update else False
         set_env = True if not update or 'environment' in update else False
