@@ -11,7 +11,13 @@ MIT License
 Copyright (c) 2021 Nils Haentjens
 """
 
+import glob
+import sys
+import os
+import re
 import argparse
+from warnings import warn
+
 import pandas as pd
 from pandas.api.types import union_categoricals
 import numpy as np
@@ -83,6 +89,9 @@ ALL_FTR_V4_COLUMN_NAMES = ['ImageId', 'Area', 'NumberBlobsInImage',
                            'HOG71', 'HOG72', 'HOG73', 'HOG74', 'HOG75', 'HOG76', 'HOG77', 'HOG78', 'HOG79', 'HOG80',
                            'HOG81', 'Area_over_PerimeterSquared', 'Area_over_Perimeter', 'H90_over_Hflip',
                            'H90_over_H180', 'Hflip_over_H180', 'summedConvexPerimeter_over_Perimeter']
+SB_HDR_STATIC_KEYS = ['investigators', 'affiliations', 'contact', 'documents', 'calibration_files',
+                      'associated_files', 'associated_file_types', 'instrument_model', 'instrument_manufacturer',
+                      'pixel_per_um', 'data_status', 'experiment']
 PATH_TO_IFCB_ANALYSIS_V2 = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ifcb-analysis-master')
 PATH_TO_IFCB_ANALYSIS_V3 = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ifcb-analysis-features_v3')
 PATH_TO_DIPUM = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'DIPUM')
@@ -609,6 +618,122 @@ class BinExtractor:
             self.matlab_engine.addpath(PATH_TO_MATLAB_FUNCTIONS)
             cfg = dict(path_to_input_data=output_path, path_to_output_table=output_path)
             self.matlab_engine.make_ifcb_table(matlab_table_info, cfg, nargout=0)
+
+    @staticmethod
+    def run_seabass(path_to_sci: str, output_path: str, metadata: dict):
+        """
+        Format science data to SeaBASS format
+        """
+
+        def fmt(value):
+            return '-9999' if pd.isna(value) else value
+
+        def data_type_mapper(value):
+            if value in ['inline', 'station']:
+                return 'flow_thru'
+            elif value in ['dock', 'niskin', 'micro-layer']:
+                return 'bottle'
+            elif value in ['towfish', 'zootow']:
+                return 'net_tow'
+            elif value in ['beads', 'culture', 'Experiment', 'PIC', 'ali6000', 'karen', 'test', 'incubation']:
+                return 'experimental'
+            else:
+                warn(f"data type {value} not supported. default to experimental")
+                return 'experimental'
+
+        def fmt_trigger_mode(value):
+            if value == 1:
+                return 'side scattering (PMTA)'
+            elif value == 2:
+                return 'chlorophyll fluorescence (PMTB)'
+            elif value == 3:
+                return 'side scattering (PMTA) or chlorophyll fluorescence (PMTB)'
+            else:
+                raise ValueError(f'trigger mode {value} not supported.')
+
+        # Prepare static header & check metadata
+        static_hdr = "/begin_header\n"
+        for k in SB_HDR_STATIC_KEYS:
+            if k not in metadata.keys():
+                raise KeyError(f'Missing key {k} in metadata')
+            static_hdr += f"/{k}={metadata[k]}\n"
+        for k in ['cruise', 'filename_descriptor', 'revision', 'dashboard_url', 'ifcb_analysis_version']:
+            if k not in metadata.keys():
+                raise KeyError(f'Missing key {k} in metadata')
+        metadata['dashboard_url'] = metadata['dashboard_url'][:-1] if metadata['dashboard_url'][-1] == '/'\
+            else metadata['dashboard_url']
+
+        sci = pd.read_csv(os.path.join(path_to_sci, 'metadata.csv'), parse_dates=['DateTime'])
+        for _, r in tqdm(sci.iterrows(), total=len(sci), desc='Exporting to SeaBASS'):
+            sb_bin_id = r.BinId[1:9] + r.BinId[10:16]  # date & time of IFCB sample
+            cruise = f"{metadata['cruise']}{r.Campaign}"
+            filename = f"{metadata['experiment']}-{cruise}_{metadata['filename_descriptor']}_" \
+                       f"{sb_bin_id}_{metadata['revision']}.sb"
+            # Get Header
+            hdr = static_hdr + \
+                  f"/cruise={cruise}\n" + \
+                  f"/station={fmt(r.Station)}\n" + \
+                  f"/eventID={r.BinId}\n" + \
+                  f"/data_file_name={filename}\n" + \
+                  f"/associatedMedia_source={metadata['dashboard_url']}/{r.BinId}.html\n" + \
+                  f"/data_type={data_type_mapper(r.Type)}\n" + \
+                  f"/start_date={r.DateTime.strftime('%Y%m%d')}\n" + \
+                  f"/end_date={r.DateTime.strftime('%Y%m%d')}\n" + \
+                  f"/start_time={r.DateTime.strftime('%H:%M:%S')}[GMT]\n" + \
+                  f"/end_time={r.DateTime.strftime('%H:%M:%S')}[GMT]\n" + \
+                  f"/north_latitude={fmt(r.Latitude)}[DEG]\n" + \
+                  f"/south_latitude={fmt(r.Latitude)}[DEG]\n" + \
+                  f"/east_longitude={fmt(r.Longitude)}[DEG]\n" + \
+                  f"/west_longitude={fmt(r.Longitude)}[DEG]\n" + \
+                  f"/water_depth=NA\n" + \
+                  f"/measurement_depth={r.Depth}\n" + \
+                  f"/volume_sampled_ml={r.VolumeSampleRequested:.2f}\n" + \
+                  f"/volume_imaged_ml={r.VolumeSampled:.4f}\n" + \
+                  f"/length_representation_instrument_varname=maxFeretDiameter\n" + \
+                  f"/width_representation_instrument_varname=minFeretDiameter\n" + \
+                  f"/missing={fmt(float('nan'))}\n" + \
+                  f"/delimiter=comma\n" + \
+                  f"!\n" + \
+                  f"! {cruise} cruise {metadata['filename_descriptor']}\n" + \
+                  f"!\n" + \
+                  f"! concentration: {r.Concentration}X\n" + \
+                  f"!\n" + \
+                  f"! IFCB trigger mode: {fmt_trigger_mode(r.TriggerSelection)}\n" + \
+                  f"!\n" + \
+                  f"! To access each image directly from the associatedMedia string: replace .html with .png\n" + \
+                  f"!\n" + \
+                  f"! {metadata['ifcb_analysis_version']} ifcb-analysis image products; " \
+                  f"https://github.com/hsosik/ifcb-analysis\n" + \
+                  f"!\n" + \
+                  f"/fields=associatedMedia,biovolume,area_cross_section,length_representation,width_representation," \
+                  f"equivalent_spherical_diameter,area_based_diameter," \
+                  f"data_provider_category_automated,data_provider_category_manual\n" + \
+                  f"/units=none,um^3,um^2,um,um,um,um,none,none\n" + \
+                  f"/end_header\n"
+            # Get content
+            bin = pd.read_csv(os.path.join(path_to_sci, f'{r.BinId}_sci.csv'))
+            lbl = 'AnnotationStatus' if 'AnnotationStatus' in bin.columns else 'Status'
+            bin['TaxonAutomated'] = bin.apply(lambda x: x['Taxon'] if x[lbl] == 'predicted' else fmt(float('nan')),
+                                              axis='columns')
+            bin['TaxonManual'] = bin.apply(lambda x: x['Taxon'] if x[lbl] == 'validated' else fmt(float('nan')),
+                                           axis='columns')
+            bin['ESD'] = 2 * (3 / (4 * np.pi) * bin.Biovolume) ** (1/3)
+            bin = bin.loc[:, ['ImageId', 'Biovolume', 'Area', 'MaxFeretDiameter', 'MinFeretDiameter',
+                              'ESD', 'EquivalentDiameter', 'TaxonAutomated', 'TaxonManual']]
+            bin['ImageId'] = [f"{metadata['dashboard_url']}/{r.BinId}_"] * len(bin) + \
+                             bin['ImageId'].astype(str).astype('str').str.rjust(5, '0') + \
+                             ['.html'] * len(bin)
+            # Apply calibration
+            bin['Biovolume'] /= metadata['pixel_per_um'] ** 3
+            bin['Area'] /= metadata['pixel_per_um'] ** 2
+            bin['MaxFeretDiameter'] /= metadata['pixel_per_um']
+            bin['MinFeretDiameter'] /= metadata['pixel_per_um']
+            bin['EquivalentDiameter'] /= metadata['pixel_per_um']
+            bin['ESD'] /= metadata['pixel_per_um']
+            # Write data
+            with open(os.path.join(output_path, filename), 'w') as f:
+                f.writelines(hdr)
+                bin.to_csv(f, index=False, header=False, float_format='%.3f', na_rep=fmt(float('nan')))
 
     def check_machine_learning(self, path_to_data):
         flag = False
