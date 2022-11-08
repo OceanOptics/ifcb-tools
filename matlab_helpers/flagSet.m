@@ -31,17 +31,17 @@ function [num] = flagSet(str)
           num = bitset(num, 8+1);
         case {'balignment', 'badalignment', 'bad_alignment'}
           num = bitset(num, 7+1);
-        case {'cvolume', 'customvolume', 'custom_volume'}
+        case {'cvolume', 'customvolume', 'custom_volume', 'custom volume'}
           num = bitset(num, 6+1);
         case 'flush'
           num = bitset(num, 5+1);
-        case {'ctrigger', 'customtrigger', 'custom_trigger', 'scatter trigger'}
+        case {'ctrigger', 'customtrigger', 'custom_trigger', 'custom trigger', 'scatter trigger'}
           num = bitset(num, 4+1);
         case 'questionnable'
           num = bitset(num, 3+1);
-        case {'bad', 'ignore', 'delete', 'failed', 'bubble', 'bubbles'}
+        case {'bad', 'ignore', 'delete', 'failed', 'bubble', 'bubbles', 'empty'}
           num = bitset(num, 2+1);
-        case {'incomplete', 'aborted'}
+        case {'incomplete', 'aborted', 'contaminated', 'soap contamination'}
           num = bitset(num, 1+1);
         otherwise
           if ~isempty(str_flag{1});

@@ -112,6 +112,50 @@ def upper_to_under(var):
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', re.sub('(.)([A-Z][a-z]+)', r'\1_\2', var)).lower()
 
 
+def flag_str_to_int(flag_str):
+    if pd.isna(flag_str):
+        return 1
+    flag_str = flag_str.strip()
+    if flag_str == '':  # Good
+        return 1
+    flag_int = 0
+    for f in flag_str.split(';'):
+        f = f.strip()
+        if f == 'corrupted':
+            if not (flag_int & 2**10):
+                flag_int += 2 ** 10
+        elif f in ('timeoffset', 'time_offset'):
+            if not (flag_int & 2**9):
+                flag_int = 2 ** 9
+        elif f in ('bfocus', 'badfocus', 'bad_focus'):
+            if not (flag_int & 2**8):
+                flag_int = 2 ** 8
+        elif f in ('balignment', 'badalignment', 'bad_alignment'):
+            if not (flag_int & 2**7):
+                flag_int = 2 ** 7
+        elif f in ('cvolume', 'customvolume', 'custom_volume', 'custom volume'):
+            if not (flag_int & 2**6):
+                flag_int = 2 ** 6
+        elif f == 'flush':
+            if not (flag_int & 2**5):
+                flag_int = 2 ** 5
+        elif f in ('ctrigger', 'customtrigger', 'custom_trigger', 'custom trigger', 'scatter trigger'):
+            if not (flag_int & 2**4):
+                flag_int = 2 ** 4
+        elif f in ('questionnable', 'questionable'):
+            if not (flag_int & 2**3):
+                flag_int = 2 ** 3
+        elif f in ('bad', 'ignore', 'delete', 'failed', 'bubble', 'bubbles', 'empty'):
+            if not (flag_int & 2**2):
+                flag_int = 2 ** 2
+        elif f in ('incomplete', 'aborted', 'contaminated', 'soap contamination'):
+            if not (flag_int & 2**1):
+                flag_int = 2 ** 1
+        else:
+            raise ValueError(f'Unknown flag: {flag_str}')
+    return flag_int
+
+
 class BinExtractor:
 
     def __init__(self, path_to_bin, path_to_environmental_csv=None,
@@ -127,6 +171,10 @@ class BinExtractor:
                                                   parse_dates=['DateTime'])
             if 'bin' not in self.environmental_data:
                 raise ValueError('Missing column bin in environmental data file.')
+            if self.environmental_data.Flag.dtypes != int:
+                # Convert flags to string
+                self.environmental_data.Flag = self.environmental_data.Flag.apply(lambda r: flag_str_to_int(r))\
+                    .astype(int)
         else:
             self.environmental_data = None
         self.classification_data = None
