@@ -1,0 +1,18 @@
+[Unit]
+Description=IFCB Scheduler
+After=network-online.target
+
+[Service]
+User=ifcb
+Group=ifcb
+WorkingDirectory=/home/ifcb/IFCButilities
+ExecStart=/usr/bin/python3 ifcb_scheduler.py
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+RestartSec=90
+StartLimitInterval=360
+StartLimitBurst=3
+
+[Install]
+WantedBy=multi-user.target
