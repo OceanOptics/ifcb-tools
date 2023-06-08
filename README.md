@@ -15,7 +15,7 @@ Install python dependencies
 
 Install matlab Engine API for python (https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html)
     
-    cd /Applications/MATLAB_R2020b.app/extern/engines/python
+    cd /Applications/MATLAB_R2023a.app/extern/engines/python
     python setup.py install
 
 Download IFCB Analysis code required to extract features from the IFCB.
