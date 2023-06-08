@@ -11,7 +11,7 @@ IFCB Tools provide tools to extract raw IFCB data to matlab files and incorporat
 ## Installation
 Install python dependencies
 
-    pip install pandas numpy PIL beautifulsoup4 imageio matlab openpyxl
+    pip install pandas numpy Pillow beautifulsoup4 imageio matlab openpyxl
 
 Install matlab Engine API for python (https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html)
     
@@ -33,7 +33,7 @@ IFCB Analysis requirements:
   Instructions are available [here](http://www.mathworks.com/matlabcentral/fileexchange/30108-mex-modified-hausdorff-distance-for-2d-point-sets)
   - the functions statxture, statmoments, invmoments, and bound2im from
   [DIPUM](http://www.imageprocessingplace.com/) must be present in the folder DIPUM.
-  They can be downloaded [here](http://fourier.eng.hmc.edu/e161/dipum/)
+  They can be downloaded [here](https://github.com/dipum/dipum-toolbox/releases)
   
 
 ## Usage
