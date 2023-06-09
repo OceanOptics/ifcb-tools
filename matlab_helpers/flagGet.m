@@ -41,6 +41,8 @@ function [str] = flagGet(num)
         str = [str '; timeOffset'];
       case 10
         str = [str '; corrupted'];
+      case 11
+        str = [str '; delayRun'];
       otherwise
         error('Unknown flag: %d', i);
     end
