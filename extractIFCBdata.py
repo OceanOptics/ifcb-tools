@@ -417,17 +417,10 @@ class BinExtractor:
             data = pd.concat([features, cytometric_data], axis=1)
         return data
 
-    def run_ml_train(self):
-        """ Extract png, cytometry, features, environmental data, and classification
-         to prepare a dataset for machine learning training """
-        print('Mode not implemented.')
-
     def run_machine_learning_single_bin(self, bin_name, output_path):
         """  Extract png, cytometry, features, and obfuscated environmental data
          to classify oceanic plankton images with machine learning algorithms """
         # Write png and get cytometry and features
-        if self.classification_data is None:
-            raise ValueError("Classification data must be loaded first.")
         try:
             data = self.get_bin_data(bin_name, write_images_to=output_path)
         except CorruptedBin as e:
@@ -491,7 +484,7 @@ class BinExtractor:
                     data = self.get_bin_data(bin_name, write_images_to=output_path, with_scale_bar=True,
                                              scale_bar_resolution=acquisition['resolution_pixel_per_micron'],
                                              feature_level=2)
-                except CorruptedBin as e:
+                except (CorruptedBin, FileNotFoundError) as e:
                     print(e)
                     continue
                 if data.empty:
