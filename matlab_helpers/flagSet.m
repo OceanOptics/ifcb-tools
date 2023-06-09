@@ -23,6 +23,8 @@ function [num] = flagSet(str)
     num = int32(0);
     for str_flag = strtrim(strsplit(str, ';'))
       switch lower(str_flag{1})
+        case {'delayRun', 'delay_run'}
+          num = bitset(num, 11+1);
         case 'corrupted'
           num = bitset(num, 10+1);
         case {'timeoffset', 'time_offset'}
