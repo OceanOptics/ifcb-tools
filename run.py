@@ -82,9 +82,9 @@ ifcb = BinExtractor(path_to_raw_data, path_to_metadata, path_to_classification, 
 #                  acquisition=acquisition_info, process=process_info, url=dashboard_url,
 #                  force=True, update=['process'])
 # Prepare IFCB data for Training or Classification with Machine Learning Methods
-ifcb.run_machine_learning(output_path=path_to_ml)
+# ifcb.run_machine_learning(output_path=path_to_ml)
 # Prepare IFCB data for Scientific Use
-# ifcb.run_science(output_path=path_to_science, bin_list=bin_list, update_classification=True,
-#                  make_matlab_table=True, matlab_table_info=info)
+ifcb.run_science(output_path=path_to_science, bin_list=bin_list, update_classification=True,
+                 make_matlab_table=True, matlab_table_info=info)
 # EXPORT IFCB data to SeaBASS
 # BinExtractor.run_seabass(path_to_science, path_to_seabass, seabass_metadata)
