@@ -18,6 +18,8 @@ Install matlab Engine API for python (https://www.mathworks.com/help/matlab/matl
     cd /Applications/MATLAB_R2023a.app/extern/engines/python
     python setup.py install
 
+Matlab Package requirements: Parallel Toolbox, MatlabProgressBar. This can be installed using the Matlab Add-On Explorer.
+
 Download IFCB Analysis code required to extract features from the IFCB.
     
     cd ifcb-tools
