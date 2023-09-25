@@ -326,7 +326,7 @@ class BinExtractor:
                                                    dtype={'object_id': str, 'object_annotation_status': 'category',
                                                           'object_annotation_hierarchy': 'category'})
         elif os.path.isdir(path_to_ecotaxa_tsv):
-            list_tsv = glob.glob(os.path.join(path_to_ecotaxa_tsv, '**', '*.tsv'))
+            list_tsv = glob.glob(os.path.join(path_to_ecotaxa_tsv, '**', '*.tsv'), recursive=True)
             # Read each tsv file
             data = [None] * len(list_tsv)
             for i, f in enumerate(tqdm(list_tsv, desc='Reading Ecotaxa Files')):
@@ -475,7 +475,8 @@ class BinExtractor:
             bin_list = self.environmental_data['bin'].to_list()
         for bin_name in tqdm(bin_list):
             # Skip if already processed
-            if os.path.exists(os.path.join(output_path, bin_name)) and not force:
+            if not force and (os.path.exists(os.path.join(output_path, bin_name)) and
+                              os.path.exists(os.path.join(output_path, bin_name, 'ecotaxa_' + bin_name + '.tsv'))):
                 print(f'OutputExists:{bin_name}: Skipped')
                 continue
             if from_raw:
