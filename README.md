@@ -15,8 +15,10 @@ Install python dependencies
 
 Install matlab Engine API for python (https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html)
     
-    cd /Applications/MATLAB_R2020b.app/extern/engines/python
+    cd /Applications/MATLAB_R2023a.app/extern/engines/python
     python setup.py install
+
+Matlab Package requirements: Parallel Toolbox, MatlabProgressBar. This can be installed using the Matlab Add-On Explorer.
 
 Download IFCB Analysis code required to extract features from the IFCB.
     
@@ -33,7 +35,7 @@ IFCB Analysis requirements:
   Instructions are available [here](http://www.mathworks.com/matlabcentral/fileexchange/30108-mex-modified-hausdorff-distance-for-2d-point-sets)
   - the functions statxture, statmoments, invmoments, and bound2im from
   [DIPUM](http://www.imageprocessingplace.com/) must be present in the folder DIPUM.
-  They can be downloaded [here](http://fourier.eng.hmc.edu/e161/dipum/)
+  They can be downloaded [here](http://github.com/dipum/dipum-toolbox/releases)
   
 
 ## Usage
