@@ -13,20 +13,26 @@ LOG_COLS = {'bin': 'IFCB_bin_id', 'Depth': 'depth', 'Type': 'source', 'Source': 
 META_DEFAULTS = {'Type': 'inline', 'Depth': 5, 'Campaign': 2, 'Concentration': 1}
 
 
-def read_env(filenames, keys=ENV_COLS):
+def read_env(filenames, keys=ENV_COLS, read_csv_kwargs=None):
     """
     Read Environmental Data typically consisting of GPS and TSG measurements.
     It concatenates data from multiple files into a single pandas dataframe/
     """
     if type(filenames) == str:
         filenames = [filenames]
+    if read_csv_kwargs is None:
+        read_csv_kwargs = {}
     for k in ['DateTime', 'Latitude', 'Longitude']:
         if k not in keys:
             raise ValueError(f'Environmental data missing key: {k}')
     ikeys = {v: k for k, v in keys.items()}  # Remap dictionary
     env = list()
     for f in filenames:
-        df = pd.read_csv(f, parse_dates=[keys['DateTime']])
+        try:
+            df = pd.read_csv(f, **read_csv_kwargs)
+        except UnicodeDecodeError:
+            print(f'Codec Error reading {f}')
+            continue
         df.rename(columns=ikeys, inplace=True)
         df.drop(columns=[c for c in df.columns if c not in keys.keys()], inplace=True)
         env.append(df)
@@ -134,9 +140,34 @@ def make_metadata(path_to_raw, env, log, events={}, defaults=META_DEFAULTS):
 
 
 if __name__ == '__main__':
-    root = '/Users/nils/Data/EXPORTS2/'
-    env = read_env(sorted(glob.glob(os.path.join(root, 'TSG', '*.csv'))))
-    log = read_log(os.path.join(root, 'IFCB107', 'IFCB_log_EXPORTS02.xlsx'))
-    events = read_events({'Epoch': os.path.join(root, 'IFCB107', 'EXPORTS2.epochs.csv')})
-    meta = make_metadata(os.path.join(root, 'IFCB107', 'raw'), env, log, events)
-    meta.to_csv(os.path.join(root, 'IFCB107', 'EXPORTS2.metadata.csv'))
+    # %% EXPORTS NA
+    # root = '/Users/nils/Data/EXPORTS2/'
+    # env = read_env(sorted(glob.glob(os.path.join(root, 'TSG', '*.csv'))))
+    # log = read_log(os.path.join(root, 'IFCB107', 'IFCB_log_EXPORTS02.xlsx'))
+    # events = read_events({'Epoch': os.path.join(root, 'IFCB107', 'EXPORTS2.epochs.csv')})
+    # meta = make_metadata(os.path.join(root, 'IFCB107', 'raw'), env, log, events)
+    # meta.to_csv(os.path.join(root, 'IFCB107', 'EXPORTS2.metadata.csv'))
+
+    # %% Tara MicroBiome
+    # root = '/Users/nils/Data/Tara/Microbiome/'
+    # env_cols = {'DateTime': 'dt', 'Latitude': 'lat', 'Longitude': 'lon',
+    #             'Salinity': 'sss', 'Temperature': 'sst'}
+    # env = read_env(os.path.join(root, 'TaraChile&TaraMicrobiome_InLine_TSG_prod.csv'), keys=env_cols)
+    # log_cols = {'bin': 'bin', 'Flag': 'flag', 'Type': 'source'}
+    # log = read_log(os.path.join(root, 'IFCB107', 'IFCB107.TaraMicrobiome.log.xlsx'), keys=log_cols)
+    # events = read_events({'Leg': os.path.join(root, 'TaraMicrobiome.legs.csv')})
+    # meta_defaults = {'Type': 'inline', 'Depth': 1.5, 'Campaign': 'Tara Microbiome', 'Concentration': 1}
+    # meta = make_metadata(os.path.join(root, 'IFCB107', 'raw'), env, log, events, defaults=meta_defaults)
+    # meta.to_csv(os.path.join(root, 'IFCB107', 'IFCB107.TaraMicrobiome.metadata.csv'))
+
+    # %% APERO
+    root = '/Users/nils/Data/APERO/'
+    env_cols = {'DateTime': 'DateTime', 'Latitude': 'Latitude', 'Longitude': 'Longitude',
+                'Salinity': 'SBE21 Salinite (PSU)', 'Temperature': 'SBE3S Temp eau peak av (deg C).1'}
+    read_kwargs = dict(sep='\t', decimal=',', parse_dates={'DateTime': ['Date', 'Heure']}, dayfirst=True, encoding="ISO-8859-1")
+    env = read_env(sorted(glob.glob(os.path.join(root, 'CSV', '*.csv'))), env_cols, read_kwargs)
+    log_cols = {k: k for k in ['bin', 'DateTime', 'Latitude', 'Longitude', 'Station', 'Cast', 'Depth', 'Niskin', 'Type']}
+    log = read_log(os.path.join(root, 'IFCB179', 'IFCB179.APERO.logsheets.xlsx'), keys=log_cols)
+    meta_defaults = {'Type': 'inline', 'Depth': 5, 'Campaign': 'APERO', 'Concentration': 1, 'Flag': 0}
+    meta = make_metadata(os.path.join(root, 'IFCB179', 'raw'), env, log, defaults=meta_defaults)
+    meta.to_csv(os.path.join(root, 'IFCB179', 'IFCB179.APERO.metadata.csv'))
