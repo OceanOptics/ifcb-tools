@@ -15,8 +15,8 @@ Install python dependencies
 
 Install matlab Engine API for python (https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html)
     
-    cd /Applications/MATLAB_R2023a.app/extern/engines/python
-    python setup.py install
+    cd /Applications/MATLAB_R2024b.app/extern/engines/python
+    python -m pip install .
 
 Matlab Package requirements: Parallel Toolbox, MatlabProgressBar. This can be installed using the Matlab Add-On Explorer.
 

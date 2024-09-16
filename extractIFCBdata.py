@@ -26,7 +26,7 @@ import matlab.engine
 from tqdm import tqdm
 
 
-__version__ = '0.3.2'
+__version__ = '0.3.3'
 
 
 ADC_COLUMN_NAMES = ['TriggerId', 'ADCTime', 'SSCIntegrated', 'FLIntegrated', 'PMTC', 'PMTD', 'SSCPeak', 'FLPeak',
@@ -192,7 +192,12 @@ class BinExtractor:
             sb_height = round(1.2 * scale_bar_resolution)  # pixel (3-4 pixels depending on resolution)
             sb_width = round(10 * scale_bar_resolution)  # um
             sb_offset = 2 + sb_height / 2
-            sb_font = ImageFont.truetype("Times New Roman", 10)  # font is required to anchor text
+            try:
+                sb_font = ImageFont.truetype("Times New Roman", 10)  # font is required to anchor text
+            except OSError:
+                # In case font is not available with OS, import font manually (ttf file must be placed in package)
+                sb_font = ImageFont.truetype("Times New Roman.ttf", 10)  # font is required to anchor text
+                # sb_font = ImageFont.load_default()  # Ultimate work-arround but doesn't support \mu
             outside_height = 10 + 4 + 2*2  # pixels font size + scale bar height + 2px padding (no padding above txt)
 
         # Parse ADC File
@@ -210,7 +215,13 @@ class BinExtractor:
             path_to_png = os.path.join(write_images_to, bin_name)
             # Open ROI File
             roi = np.fromfile(os.path.join(self.path_to_bin, bin_name + '.roi'), 'uint8')
-            if len(roi) != adc['EndByte'].iloc[-1]:
+            try:
+                last_non_empty_index = -1
+                while adc['EndByte'].iloc[last_non_empty_index] == 0:
+                    last_non_empty_index -= 1
+            except IndexError:
+                raise CorruptedBin(f'CorruptedBin:{bin_name}: adc end byte is all zeros.')
+            if len(roi) != adc['EndByte'].iloc[last_non_empty_index]:
                 raise CorruptedBin(f'CorruptedBin:{bin_name}: adc end byte is greater than roi size.')
             if not os.path.isdir(path_to_png):
                 os.mkdir(path_to_png)
@@ -516,8 +527,10 @@ class BinExtractor:
                 et['object_lon'] = env.Longitude.values[0] if not env.Latitude.isna().any() else -68.6704788
                 et['object_date'] = env.DateTime.dt.strftime('%Y%m%d').values[0]
                 et['object_time'] = env.DateTime.dt.strftime('%H%M%S').values[0]
-                et['object_depth_min'] = env.Depth.values[0]
-                et['object_depth_max'] = env.Depth.values[0]
+                if 'Depth' in env.columns:
+                    et['object_depth'] = env.Depth.values[0]
+                elif 'DepthMin' not in env.columns or 'DepthMax' not in env.columns:
+                    raise KeyError('Environmental data requires column "Depth" or "DepthMin" and "DepthMax"')
             if from_raw:
                 # Append all features and cytometry to Object
                 # Done here to add columns in order

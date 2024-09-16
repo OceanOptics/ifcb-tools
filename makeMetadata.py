@@ -161,13 +161,28 @@ if __name__ == '__main__':
     # meta.to_csv(os.path.join(root, 'IFCB107', 'IFCB107.TaraMicrobiome.metadata.csv'))
 
     # %% APERO
-    root = '/Users/nils/Data/APERO/'
-    env_cols = {'DateTime': 'DateTime', 'Latitude': 'Latitude', 'Longitude': 'Longitude',
-                'Salinity': 'SBE21 Salinite (PSU)', 'Temperature': 'SBE3S Temp eau peak av (deg C).1'}
-    read_kwargs = dict(sep='\t', decimal=',', parse_dates={'DateTime': ['Date', 'Heure']}, dayfirst=True, encoding="ISO-8859-1")
-    env = read_env(sorted(glob.glob(os.path.join(root, 'CSV', '*.csv'))), env_cols, read_kwargs)
-    log_cols = {k: k for k in ['bin', 'DateTime', 'Latitude', 'Longitude', 'Station', 'Cast', 'Depth', 'Niskin', 'Type']}
-    log = read_log(os.path.join(root, 'IFCB179', 'IFCB179.APERO.logsheets.xlsx'), keys=log_cols)
-    meta_defaults = {'Type': 'inline', 'Depth': 5, 'Campaign': 'APERO', 'Concentration': 1, 'Flag': 0}
-    meta = make_metadata(os.path.join(root, 'IFCB179', 'raw'), env, log, defaults=meta_defaults)
-    meta.to_csv(os.path.join(root, 'IFCB179', 'IFCB179.APERO.metadata.csv'))
+    # root = '/Users/nils/Data/APERO/'
+    # env_cols = {'DateTime': 'DateTime', 'Latitude': 'Latitude', 'Longitude': 'Longitude',
+    #             'Salinity': 'SBE21 Salinite (PSU)', 'Temperature': 'SBE3S Temp eau peak av (deg C).1'}
+    # read_kwargs = dict(sep='\t', decimal=',', parse_dates={'DateTime': ['Date', 'Heure']}, dayfirst=True, encoding="ISO-8859-1")
+    # env = read_env(sorted(glob.glob(os.path.join(root, 'CSV', '*.csv'))), env_cols, read_kwargs)
+    # log_cols = {k: k for k in ['bin', 'DateTime', 'Latitude', 'Longitude', 'Station', 'Cast', 'Depth', 'Niskin', 'Type']}
+    # log = read_log(os.path.join(root, 'IFCB179', 'IFCB179.APERO.logsheets.xlsx'), keys=log_cols)
+    # meta_defaults = {'Type': 'inline', 'Depth': 5, 'Campaign': 'APERO', 'Concentration': 1, 'Flag': 0}
+    # meta = make_metadata(os.path.join(root, 'IFCB179', 'raw'), env, log, defaults=meta_defaults)
+    # meta.to_csv(os.path.join(root, 'IFCB179', 'IFCB179.APERO.metadata.csv'))
+
+    # %% Tara Europa
+    root = '/Users/nils/Data/Tara/Europa'
+    env_cols = {'DateTime': 'dt', 'Latitude': 'lat', 'Longitude': 'lon',
+                'Salinity': 'sss', 'Temperature': 'sst'}
+    read_kwargs = dict(parse_dates=['dt']) #, date_format='%d-%b-%Y %H:%M:%S')
+    env = read_env(os.path.join(root, 'TaraEuropa_InLine_TSG_20230403_20231109_Product_v20240131.csv'), env_cols, read_kwargs)
+    # log_cols = {'bin': 'bin', 'Flag': 'flag', 'Type': 'source'}
+    # log = read_log(os.path.join(root, 'IFCB107', 'IFCB107.TaraEuropa.log.xlsx'), keys=log_cols)
+    log = pd.DataFrame({'bin': [], 'Flag': []})
+    # events = read_events({'Leg': os.path.join(root, 'TaraEuropa.legs.csv')})
+    events = {}
+    meta_defaults = {'Type': 'inline', 'Depth': 1.5, 'Campaign': 'Tara Europa', 'Concentration': 1}
+    meta = make_metadata(os.path.join(root, 'IFCB107', 'raw'), env, log, events, defaults=meta_defaults)
+    meta.to_csv(os.path.join(root, 'IFCB107', 'IFCB107.TaraEuropa.metadata.csv'))
