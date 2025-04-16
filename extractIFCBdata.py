@@ -26,7 +26,7 @@ import matlab.engine
 from tqdm import tqdm
 
 
-__version__ = '0.3.3'
+__version__ = '0.3.4'
 
 
 ADC_COLUMN_NAMES = ['TriggerId', 'ADCTime', 'SSCIntegrated', 'FLIntegrated', 'PMTC', 'PMTD', 'SSCPeak', 'FLPeak',
@@ -121,16 +121,19 @@ def flag_str_to_int(flag_str):
     flag_int = 0
     for f in flag_str.split(';'):
         f = f.strip()
-        if f == 'corrupted':
+        if f in ('questionable alignment', 'questionable_alignment', 'questionablealignment'):
+            if not (flag_int & 2 ** 11):
+                flag_int += 2 ** 11
+        elif f == 'corrupted':
             if not (flag_int & 2**10):
                 flag_int += 2 ** 10
         elif f in ('timeoffset', 'time_offset'):
             if not (flag_int & 2**9):
                 flag_int = 2 ** 9
-        elif f in ('bfocus', 'badfocus', 'bad_focus'):
+        elif f in ('bad focus', 'bad_focus', 'badfocus', 'bfocus'):
             if not (flag_int & 2**8):
                 flag_int = 2 ** 8
-        elif f in ('balignment', 'badalignment', 'bad_alignment'):
+        elif f in ('bad alignment', 'bad_alignment', 'badalignment', 'balignment'):
             if not (flag_int & 2**7):
                 flag_int = 2 ** 7
         elif f in ('cvolume', 'customvolume', 'custom_volume', 'custom volume'):
