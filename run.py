@@ -1,6 +1,11 @@
 from extractIFCBdata import BinExtractor, __version__
 import os.path
+import warnings
 from datetime import datetime
+
+import pandas as pd
+
+from extractIFCBdata import BinExtractor, __version__, flag_str_to_int
 
 
 """
@@ -22,9 +27,10 @@ path_to_seabass = os.path.join(root, 'SB_20211031')
 """
 Parameters specific to Scientific Export
 """
-info = {'PROJECT_NAME': 'EXPORTS-NA',
-        'ECOTAXA_EXPORT_DATE': '20211031',
-        'IFCB_RESOLUTION': 2.7488,  # pixels/µm
+info = {'PROJECT_NAME': experiment,
+        'ECOTAXA_EXPORT_DATE': '20230507',
+        # 'IFCB_RESOLUTION': 2.7488,  # pixels/µm  (IFCB107)
+        'IFCB_RESOLUTION': 3.4,  # pixels/µm  (DEFAULT)
         'CALIBRATED': True,  # if True, apply calibration from pixel to µm using the IFCB_RESOLUTION
         'REMOVED_CONCENTRATED_SAMPLES': False}
 
@@ -33,37 +39,52 @@ Parameters specific to EcoTaxa export
 """
 # Image acquisition system informations
 acquisition_info = {'instrument': 'IFCB',
-                    'serial_number': '107',
+                    'serial_number': instr.split('B')[-1],
                     'resolution_pixel_per_micron': info['IFCB_RESOLUTION']}
 # Information about processing of images
 process_info = {'id': f"ifcb-tools-nils-{datetime.now().strftime('%Y%m%d')}",
                 'software': 'ifcb-tools', 'software_version': __version__,
                 'author': 'Nils Haentjens', 'date': datetime.now().strftime('%Y%m%d')}
 # Public IFCB Dashboard URL
-dashboard_url = 'https://ifcb-data.whoi.edu/timeline?dataset=EXPORTS'
+dashboard_url = f'http://misclab.umeoce.maine.edu:8081/timeline?dataset={experiment}'
 # List of bins to image
 bin_list = []  # Process all bins present in metadata file
 # bin_list = ['D20210503T092408_IFCB107', 'D20210506T001620_IFCB107']  # Process selected bins
+# Custom bin list based on metadata
+meta = pd.read_csv(path_to_metadata, index_col='bin')
+# ['LEG01_Lorient-Amsterdam', 'LEG02_Amsterdam-Aarhus', 'LEG03_Aarhus-Sopot', 'LEG05_Tallin-Kristineberg', 'LEG06_Kristineberg-Galway', 'LEG07_Galway-Bilbao', 'LEG08_Bilbao-Cadiz',
+#  nan, 'LEG09_Malaga-Barcelona', 'LEG10_Barcelona-Marseille', 'LEG11_Marseille-Napoli', 'LEG13_Ancona-Kotor', 'LEG_HyperBoost']
+leg_name = 'LEG_HyperBoost'
+meta['flag_int'] = meta.Flag.apply(flag_str_to_int).astype(int)
+bin_list = meta.index[(meta.Leg == leg_name) &
+                      ~((meta.flag_int & 2**10) | (meta.flag_int & 2**2) | (meta.flag_int & 2**1) | (meta.flag_int & 2**5))].tolist()
+path_to_ecotaxa = os.path.join(path_to_ecotaxa, leg_name)
+if not os.path.exists(path_to_ecotaxa):
+    os.makedirs(path_to_ecotaxa)
+path_to_raw_data = os.path.join(root, '2024')
+
 
 """
 Parameters specific to SeaBASS export
 """
 seabass_metadata = {
-    'investigators': 'Lee_Karp-Boss,Emmanuel_Boss,Nils_Haentjens,Alison_Chase',
-    'affiliations': 'University_of_Maine,University_of_Maine,University_of_Maine,University_of_Maine',
+    'investigators': 'Nils_Haentjens,Alison_Chase',
+    'affiliations': 'University_of_Maine,University_of_Maine',
     'contact': 'nils.haentjens@maine.edu,lee.karp-boss@maine.edu',
-    'documents': f'{project_name}.IFCB.brief-protocol.pdf,{project_name}.IFCB.checklist.pdf',
+    'documents': f'{experiment}.IFCB.brief-protocol.pdf,{experiment}.IFCB.checklist.pdf',
     'calibration_files': 'no_cal_files',
-    'associated_files': f'{project_name}.IFCB.raw.zip',
+    'associated_files': f'{experiment}.IFCB.raw.zip',
     'associated_file_types': 'raw',
-    'instrument_model': 'Imaging_FlowCytobot_IFCB107',
+    'instrument_model': f'Imaging_FlowCytobot_IFCB{acquisition_info["serial_number"]}',
     'instrument_manufacturer': 'McLane_Research_Laboratories_Inc',
     'pixel_per_um': info['IFCB_RESOLUTION'],
     'data_status': 'update',
     'experiment': 'NAAMES',
     'cruise': 'NAAMES',
+    'experiment': experiment,
+    'cruise': cruise,
     'filename_descriptor': 'IFCB_plankton&particles',
-    'revision': 'R1',
+    'revision': 'R0',
     'dashboard_url': dashboard_url,
     'ifcb_analysis_version': 'v4'
 }
@@ -78,9 +99,10 @@ ifcb = BinExtractor(path_to_raw_data, path_to_metadata, path_to_classification, 
                     matlab_parallel_flag=True)#, matlab_engine=matlab_engine)
 
 # Prepare IFCB data for EcoTaxa
-# ifcb.run_ecotaxa(output_path=path_to_ecotaxa, bin_list=bin_list,
-#                  acquisition=acquisition_info, process=process_info, url=dashboard_url,
-#                  force=True, update=['process'])
+warnings.filterwarnings('ignore', category=pd.errors.PerformanceWarning)
+ifcb.run_ecotaxa(output_path=path_to_ecotaxa, bin_list=bin_list,
+                 acquisition=acquisition_info, process=process_info, url=dashboard_url)
+                 # force=True, update=['process'])
 # Prepare IFCB data for Training or Classification with Machine Learning Methods
 # ifcb.run_machine_learning(output_path=path_to_ml)
 # Prepare IFCB data for Scientific Use

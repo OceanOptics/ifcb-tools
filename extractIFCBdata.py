@@ -121,7 +121,7 @@ def flag_str_to_int(flag_str):
     flag_int = 0
     for f in flag_str.split(';'):
         f = f.strip()
-        if f in ('questionable alignment', 'questionable_alignment', 'questionablealignment'):
+        if f in ('questionable alignment', 'questionable_alignment', 'questionablealignment', 'questionable allignement'):
             if not (flag_int & 2 ** 11):
                 flag_int += 2 ** 11
         elif f == 'corrupted':
